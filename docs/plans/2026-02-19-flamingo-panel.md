@@ -6,7 +6,11 @@
 
 **Architecture:** Single Cloudflare Worker serving both a Hono REST API and a React SPA frontend via Workers Assets. D1 for persistence, KV for sessions/cache, Durable Objects for WebSocket proxying to Wings nodes, R2 for file staging, and Queues for background jobs. The Panel communicates with Wings nodes over HTTPS using Wings' existing Bearer token auth and JWT-signed WebSocket connections.
 
-**Tech Stack:** Hono.js (API), React 18 + TanStack Router + TanStack Query (frontend), TailwindCSS + shadcn/ui (UI), Vite (build), Cloudflare D1/KV/R2/Durable Objects/Queues (infra), Zod (validation), jose (JWT), Drizzle ORM (D1 queries)
+**Tech Stack:** Hono.js (API), React 18 + TanStack Router + TanStack Query (frontend), TailwindCSS + shadcn/ui (UI, exclusively), Vite (build), Cloudflare D1/KV/R2/Durable Objects/Queues (infra), Zod (validation), jose (JWT), Drizzle ORM (D1 queries), @node-rs/argon2 (password hashing)
+
+**Design:** Pink/flamingo theme using shadcn/ui exclusively. All UI components must use shadcn/ui primitives (Button, Card, Input, Dialog, Table, Tabs, etc.) - no custom HTML elements. Theme customized with pink primary color (`hsl(330, 80%, 60%)`).
+
+**Auth:** Session-based auth with KV-stored sessions + Argon2id password hashing + refresh token rotation + rate limiting + optional TOTP 2FA. No raw JWTs exposed to frontend - sessions only.
 
 ---
 
@@ -27,14 +31,27 @@
 **Step 1: Initialize package.json**
 
 ```bash
-cd flamingo-panel && npm init -y
+cd flamingo-panel && bun init -y
 ```
 
 **Step 2: Install core dependencies**
 
 ```bash
-npm install hono @hono/zod-validator zod drizzle-orm jose
-npm install -D wrangler @cloudflare/workers-types typescript vite @vitejs/plugin-react react react-dom @types/react @types/react-dom tailwindcss @tailwindcss/vite @tanstack/react-router @tanstack/react-query
+bun add hono @hono/zod-validator zod drizzle-orm jose @node-rs/argon2
+bun add -D wrangler @cloudflare/workers-types typescript vite @vitejs/plugin-react react react-dom @types/react @types/react-dom tailwindcss @tailwindcss/vite @tanstack/react-router @tanstack/react-query class-variance-authority clsx tailwind-merge lucide-react
+```
+
+**Step 2b: Initialize shadcn/ui**
+
+```bash
+npx shadcn@latest init
+```
+
+Choose: New York style, Zinc base color, CSS variables: yes.
+
+Then install all needed components:
+```bash
+npx shadcn@latest add button card input label dialog table tabs badge separator dropdown-menu sheet toast alert avatar command select textarea tooltip scroll-area skeleton switch popover
 ```
 
 **Step 3: Create wrangler.toml**
@@ -204,9 +221,56 @@ export function App() {
 }
 ```
 
-`src/web/index.css`:
+`src/web/index.css` (Pink flamingo theme for shadcn/ui):
 ```css
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 330 10% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 330 10% 5%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 330 10% 5%;
+    --primary: 330 80% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 330 20% 94%;
+    --secondary-foreground: 330 10% 20%;
+    --muted: 330 10% 94%;
+    --muted-foreground: 330 10% 45%;
+    --accent: 330 30% 92%;
+    --accent-foreground: 330 10% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 330 15% 90%;
+    --input: 330 15% 90%;
+    --ring: 330 80% 60%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 6% 6%;
+    --foreground: 330 5% 95%;
+    --card: 240 5% 9%;
+    --card-foreground: 330 5% 95%;
+    --popover: 240 5% 9%;
+    --popover-foreground: 330 5% 95%;
+    --primary: 330 80% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 330 5% 90%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 330 5% 55%;
+    --accent: 330 30% 15%;
+    --accent-foreground: 330 5% 90%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 330 80% 60%;
+  }
+}
 ```
 
 **Step 10: Add scripts to package.json and verify build**
@@ -218,15 +282,15 @@ Add to `package.json` scripts:
     "dev": "wrangler dev",
     "dev:web": "vite dev --config vite.config.ts",
     "build:web": "vite build --config vite.config.ts",
-    "build": "npm run build:web",
-    "deploy": "npm run build && wrangler deploy",
+    "build": "bun run build:web",
+    "deploy": "bun run build && wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply flamingo-db --local",
     "test": "vitest"
   }
 }
 ```
 
-Run: `npm run build:web`
+Run: `bun run build:web`
 Expected: Vite builds to `dist/web/` successfully.
 
 **Step 11: Commit**
@@ -570,73 +634,177 @@ git add -A && git commit -m "feat: add D1 database schema with Drizzle ORM"
 
 ---
 
-### Task 1.2: Authentication system (JWT + password hashing)
+### Task 1.2: Authentication system (sessions + Argon2id + rate limiting)
 
 **Files:**
-- Create: `src/api/auth.ts`
-- Create: `src/lib/auth.ts` (JWT + password utilities)
+- Create: `src/lib/auth.ts` (password hashing + session management)
+- Create: `src/lib/rate-limit.ts` (login rate limiting)
+- Create: `src/api/auth.ts` (auth routes)
+- Create: `src/api/middleware/auth.ts` (session middleware)
 - Modify: `src/api/index.ts` (mount auth routes)
+- Modify: `src/env.ts` (add KV binding)
 
-**Step 1: Create auth utility library `src/lib/auth.ts`**
+**Architecture:**
+- Passwords hashed with Argon2id (via @node-rs/argon2)
+- Sessions stored in KV with 7-day TTL
+- Each session has a refresh token for silent renewal
+- Rate limiting on login: 5 attempts per IP per 15 minutes (KV-based)
+- No JWTs exposed to frontend. Cookie-based session ID or Authorization header with opaque session token.
+- TOTP 2FA support (optional, user-enabled)
+
+**Step 1: Create auth library `src/lib/auth.ts`**
 
 ```typescript
-import { SignJWT, jwtVerify } from "jose";
+import { hash, verify } from "@node-rs/argon2";
 
-const encoder = new TextEncoder();
-
+// Argon2id password hashing with recommended parameters
 export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits"]
-  );
-  const hash = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-    key,
-    256
-  );
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, "0")).join("");
-  const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-  return `${saltHex}:${hashHex}`;
+  return hash(password, {
+    memoryCost: 19456,   // 19 MiB
+    timeCost: 2,         // 2 iterations
+    parallelism: 1,      // single-threaded (Workers constraint)
+    outputLen: 32,
+  });
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [saltHex, hashHex] = stored.split(":");
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(h => parseInt(h, 16)));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits"]
-  );
-  const hash = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-    key,
-    256
-  );
-  const computed = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-  return computed === hashHex;
+  try {
+    return await verify(stored, password);
+  } catch {
+    return false;
+  }
 }
 
-export async function createToken(payload: Record<string, unknown>, secret: string): Promise<string> {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("24h")
-    .sign(encoder.encode(secret));
+// Session management
+export interface Session {
+  userId: string;
+  email: string;
+  role: "admin" | "user";
+  createdAt: number;
+  expiresAt: number;
+  refreshToken: string;
+  ip: string;
+  userAgent: string;
 }
 
-export async function verifyToken(token: string, secret: string) {
-  const { payload } = await jwtVerify(token, encoder.encode(secret));
-  return payload;
+export function generateSessionId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function generateRefreshToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(48));
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const SESSION_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
+const SESSION_PREFIX = "session:";
+
+export async function createSession(
+  kv: KVNamespace,
+  userId: string,
+  email: string,
+  role: "admin" | "user",
+  ip: string,
+  userAgent: string,
+): Promise<{ sessionId: string; refreshToken: string; expiresAt: number }> {
+  const sessionId = generateSessionId();
+  const refreshToken = generateRefreshToken();
+  const now = Date.now();
+  const expiresAt = now + SESSION_TTL * 1000;
+
+  const session: Session = {
+    userId, email, role, createdAt: now, expiresAt,
+    refreshToken, ip, userAgent,
+  };
+
+  await kv.put(`${SESSION_PREFIX}${sessionId}`, JSON.stringify(session), {
+    expirationTtl: SESSION_TTL,
+  });
+
+  // Track active sessions per user (for listing/revoking)
+  const userSessions = JSON.parse(await kv.get(`user-sessions:${userId}`) || "[]") as string[];
+  userSessions.push(sessionId);
+  await kv.put(`user-sessions:${userId}`, JSON.stringify(userSessions), {
+    expirationTtl: SESSION_TTL,
+  });
+
+  return { sessionId, refreshToken, expiresAt };
+}
+
+export async function getSession(kv: KVNamespace, sessionId: string): Promise<Session | null> {
+  const data = await kv.get(`${SESSION_PREFIX}${sessionId}`);
+  if (!data) return null;
+  const session = JSON.parse(data) as Session;
+  if (session.expiresAt < Date.now()) {
+    await kv.delete(`${SESSION_PREFIX}${sessionId}`);
+    return null;
+  }
+  return session;
+}
+
+export async function deleteSession(kv: KVNamespace, sessionId: string): Promise<void> {
+  const session = await getSession(kv, sessionId);
+  if (session) {
+    // Remove from user's session list
+    const userSessions = JSON.parse(await kv.get(`user-sessions:${session.userId}`) || "[]") as string[];
+    await kv.put(`user-sessions:${session.userId}`, JSON.stringify(userSessions.filter(s => s !== sessionId)));
+  }
+  await kv.delete(`${SESSION_PREFIX}${sessionId}`);
+}
+
+export async function refreshSession(
+  kv: KVNamespace,
+  sessionId: string,
+  refreshToken: string,
+): Promise<{ sessionId: string; refreshToken: string; expiresAt: number } | null> {
+  const session = await getSession(kv, sessionId);
+  if (!session || session.refreshToken !== refreshToken) return null;
+
+  // Rotate: delete old session, create new one
+  await deleteSession(kv, sessionId);
+  return createSession(kv, session.userId, session.email, session.role, session.ip, session.userAgent);
+}
+
+export async function revokeAllUserSessions(kv: KVNamespace, userId: string): Promise<void> {
+  const userSessions = JSON.parse(await kv.get(`user-sessions:${userId}`) || "[]") as string[];
+  await Promise.all(userSessions.map(sid => kv.delete(`${SESSION_PREFIX}${sid}`)));
+  await kv.delete(`user-sessions:${userId}`);
 }
 ```
 
-**Step 2: Create auth routes `src/api/auth.ts`**
+**Step 2: Create rate limiter `src/lib/rate-limit.ts`**
+
+```typescript
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_ATTEMPTS = 5;
+
+export async function checkRateLimit(
+  kv: KVNamespace,
+  key: string,
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const kvKey = `ratelimit:${key}`;
+  const data = await kv.get(kvKey);
+
+  const now = Date.now();
+  let attempts: number[] = data ? JSON.parse(data) : [];
+
+  // Remove expired attempts
+  attempts = attempts.filter(t => now - t < WINDOW_MS);
+
+  if (attempts.length >= MAX_ATTEMPTS) {
+    const oldestInWindow = Math.min(...attempts);
+    return { allowed: false, remaining: 0, resetAt: oldestInWindow + WINDOW_MS };
+  }
+
+  attempts.push(now);
+  await kv.put(kvKey, JSON.stringify(attempts), { expirationTtl: Math.ceil(WINDOW_MS / 1000) });
+
+  return { allowed: true, remaining: MAX_ATTEMPTS - attempts.length, resetAt: now + WINDOW_MS };
+}
+```
+
+**Step 3: Create auth routes `src/api/auth.ts`**
 
 ```typescript
 import { Hono } from "hono";
@@ -645,73 +813,168 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import type { Env } from "../env";
 import { getDb, schema } from "../db";
-import { hashPassword, verifyPassword, createToken } from "../lib/auth";
+import {
+  hashPassword, verifyPassword, createSession,
+  deleteSession, refreshSession, revokeAllUserSessions,
+} from "../lib/auth";
+import { checkRateLimit } from "../lib/rate-limit";
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(128),
 });
 
 const registerSchema = loginSchema.extend({
-  username: z.string().min(3).max(32),
+  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_-]+$/, "Alphanumeric, hyphens, underscores only"),
 });
 
 authRoutes.post("/login", zValidator("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
-  const db = getDb(c.env.DB);
+  const ip = c.req.header("CF-Connecting-IP") || c.req.header("X-Forwarded-For") || "unknown";
 
-  const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get();
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return c.json({ error: "Invalid credentials" }, 401);
+  // Rate limit by IP
+  const rateLimit = await checkRateLimit(c.env.KV, `login:${ip}`);
+  if (!rateLimit.allowed) {
+    c.header("Retry-After", String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)));
+    return c.json({ error: "Too many login attempts. Please try again later." }, 429);
   }
 
-  const token = await createToken(
-    { sub: user.id, email: user.email, role: user.role },
-    c.env.JWT_SECRET
+  // Also rate limit by email to prevent credential stuffing
+  const emailLimit = await checkRateLimit(c.env.KV, `login:${email}`);
+  if (!emailLimit.allowed) {
+    return c.json({ error: "Too many login attempts for this account." }, 429);
+  }
+
+  const db = getDb(c.env.DB);
+  const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get();
+
+  // Constant-time-ish: always verify even if user doesn't exist
+  if (!user) {
+    await hashPassword("dummy-password-to-prevent-timing-attack");
+    return c.json({ error: "Invalid email or password" }, 401);
+  }
+
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    return c.json({ error: "Invalid email or password" }, 401);
+  }
+
+  const session = await createSession(
+    c.env.KV, user.id, user.email, user.role as "admin" | "user",
+    ip, c.req.header("User-Agent") || "",
   );
 
-  return c.json({ token, user: { id: user.id, email: user.email, username: user.username, role: user.role } });
+  return c.json({
+    session_token: session.sessionId,
+    refresh_token: session.refreshToken,
+    expires_at: session.expiresAt,
+    user: { id: user.id, email: user.email, username: user.username, role: user.role },
+  });
 });
 
 authRoutes.post("/register", zValidator("json", registerSchema), async (c) => {
   const { email, username, password } = c.req.valid("json");
+  const ip = c.req.header("CF-Connecting-IP") || c.req.header("X-Forwarded-For") || "unknown";
   const db = getDb(c.env.DB);
 
-  const existing = await db.select().from(schema.users).where(eq(schema.users.email, email)).get();
-  if (existing) {
-    return c.json({ error: "Email already registered" }, 409);
-  }
+  // Check both email and username uniqueness
+  const existingEmail = await db.select().from(schema.users).where(eq(schema.users.email, email)).get();
+  if (existingEmail) return c.json({ error: "Email already registered" }, 409);
+
+  const existingUsername = await db.select().from(schema.users).where(eq(schema.users.username, username)).get();
+  if (existingUsername) return c.json({ error: "Username already taken" }, 409);
 
   const passwordHash = await hashPassword(password);
 
   // First user becomes admin
-  const count = await db.select().from(schema.users).all();
-  const role = count.length === 0 ? "admin" : "user";
+  const userCount = await db.select().from(schema.users).all();
+  const role = userCount.length === 0 ? "admin" : "user";
 
   const user = await db.insert(schema.users).values({
-    email,
-    username,
-    passwordHash,
-    role,
+    email, username, passwordHash, role,
   }).returning().get();
 
-  const token = await createToken(
-    { sub: user.id, email: user.email, role: user.role },
-    c.env.JWT_SECRET
+  const session = await createSession(
+    c.env.KV, user.id, user.email, role as "admin" | "user",
+    ip, c.req.header("User-Agent") || "",
   );
 
-  return c.json({ token, user: { id: user.id, email: user.email, username: user.username, role: user.role } }, 201);
+  return c.json({
+    session_token: session.sessionId,
+    refresh_token: session.refreshToken,
+    expires_at: session.expiresAt,
+    user: { id: user.id, email: user.email, username: user.username, role: user.role },
+  }, 201);
+});
+
+authRoutes.post("/refresh", zValidator("json", z.object({
+  session_token: z.string(),
+  refresh_token: z.string(),
+})), async (c) => {
+  const { session_token, refresh_token } = c.req.valid("json");
+  const newSession = await refreshSession(c.env.KV, session_token, refresh_token);
+  if (!newSession) return c.json({ error: "Invalid or expired session" }, 401);
+
+  return c.json({
+    session_token: newSession.sessionId,
+    refresh_token: newSession.refreshToken,
+    expires_at: newSession.expiresAt,
+  });
+});
+
+authRoutes.post("/logout", async (c) => {
+  const sessionId = c.req.header("Authorization")?.replace("Bearer ", "");
+  if (sessionId) await deleteSession(c.env.KV, sessionId);
+  return c.body(null, 204);
+});
+
+authRoutes.post("/logout-all", async (c) => {
+  // Requires auth - get user from session
+  const sessionId = c.req.header("Authorization")?.replace("Bearer ", "");
+  if (!sessionId) return c.json({ error: "Unauthorized" }, 401);
+  const session = await (await import("../lib/auth")).getSession(c.env.KV, sessionId);
+  if (!session) return c.json({ error: "Unauthorized" }, 401);
+
+  await revokeAllUserSessions(c.env.KV, session.userId);
+  return c.body(null, 204);
+});
+
+authRoutes.post("/change-password", zValidator("json", z.object({
+  current_password: z.string(),
+  new_password: z.string().min(8).max(128),
+})), async (c) => {
+  const sessionId = c.req.header("Authorization")?.replace("Bearer ", "");
+  if (!sessionId) return c.json({ error: "Unauthorized" }, 401);
+  const session = await (await import("../lib/auth")).getSession(c.env.KV, sessionId);
+  if (!session) return c.json({ error: "Unauthorized" }, 401);
+
+  const { current_password, new_password } = c.req.valid("json");
+  const db = getDb(c.env.DB);
+  const user = await db.select().from(schema.users).where(eq(schema.users.id, session.userId)).get();
+  if (!user) return c.json({ error: "User not found" }, 404);
+
+  if (!(await verifyPassword(current_password, user.passwordHash))) {
+    return c.json({ error: "Current password is incorrect" }, 401);
+  }
+
+  const newHash = await hashPassword(new_password);
+  await db.update(schema.users).set({ passwordHash: newHash, updatedAt: new Date().toISOString() })
+    .where(eq(schema.users.id, user.id));
+
+  // Revoke all other sessions (force re-login everywhere)
+  await revokeAllUserSessions(c.env.KV, user.id);
+
+  return c.json({ message: "Password changed. All sessions revoked." });
 });
 ```
 
-**Step 3: Create auth middleware `src/api/middleware/auth.ts`**
+**Step 4: Create session-based auth middleware `src/api/middleware/auth.ts`**
 
 ```typescript
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../../env";
-import { verifyToken } from "../../lib/auth";
+import { getSession } from "../../lib/auth";
 
 export type AuthUser = {
   id: string;
@@ -721,24 +984,25 @@ export type AuthUser = {
 
 export const requireAuth = createMiddleware<{
   Bindings: Env;
-  Variables: { user: AuthUser };
+  Variables: { user: AuthUser; sessionId: string };
 }>(async (c, next) => {
-  const header = c.req.header("Authorization");
-  if (!header?.startsWith("Bearer ")) {
-    return c.json({ error: "Unauthorized" }, 401);
+  const sessionId = c.req.header("Authorization")?.replace("Bearer ", "");
+  if (!sessionId) {
+    return c.json({ error: "Unauthorized: missing session token" }, 401);
   }
 
-  try {
-    const payload = await verifyToken(header.slice(7), c.env.JWT_SECRET);
-    c.set("user", {
-      id: payload.sub as string,
-      email: payload.email as string,
-      role: payload.role as "admin" | "user",
-    });
-    await next();
-  } catch {
-    return c.json({ error: "Invalid or expired token" }, 401);
+  const session = await getSession(c.env.KV, sessionId);
+  if (!session) {
+    return c.json({ error: "Unauthorized: invalid or expired session" }, 401);
   }
+
+  c.set("user", {
+    id: session.userId,
+    email: session.email,
+    role: session.role,
+  });
+  c.set("sessionId", sessionId);
+  await next();
 });
 
 export const requireAdmin = createMiddleware<{
@@ -753,7 +1017,7 @@ export const requireAdmin = createMiddleware<{
 });
 ```
 
-**Step 4: Mount auth routes in `src/api/index.ts`**
+**Step 5: Mount auth routes in `src/api/index.ts`**
 
 ```typescript
 import { Hono } from "hono";
@@ -766,10 +1030,10 @@ apiRoutes.get("/health", (c) => c.json({ status: "ok", version: "0.1.0" }));
 apiRoutes.route("/auth", authRoutes);
 ```
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
-git add -A && git commit -m "feat: add JWT auth system with login/register endpoints"
+git add -A && git commit -m "feat: add session-based auth with Argon2id, rate limiting, and refresh tokens"
 ```
 
 ---
@@ -2159,7 +2423,7 @@ export const api = {
 **Step 2: Create auth context `src/web/lib/auth.tsx`**
 
 ```tsx
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { api } from "./api";
 
 interface User {
@@ -2169,54 +2433,99 @@ interface User {
   role: "admin" | "user";
 }
 
+interface AuthResponse {
+  session_token: string;
+  refresh_token: string;
+  expires_at: number;
+  user: User;
+}
+
 interface AuthContextType {
   user: User | null;
-  token: string | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("token"));
+  const [loading, setLoading] = useState(true);
 
+  // Restore session on mount
   useEffect(() => {
-    if (token) {
+    const stored = localStorage.getItem("session");
+    if (stored) {
       try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        setUser({ id: payload.sub, email: payload.email, username: "", role: payload.role });
+        const { user, expiresAt } = JSON.parse(stored);
+        if (expiresAt > Date.now()) {
+          setUser(user);
+        } else {
+          // Try refresh
+          tryRefresh();
+        }
       } catch {
-        localStorage.removeItem("token");
-        setToken(null);
+        localStorage.removeItem("session");
       }
     }
-  }, [token]);
+    setLoading(false);
+  }, []);
+
+  const tryRefresh = async () => {
+    const sessionToken = localStorage.getItem("session_token");
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!sessionToken || !refreshToken) return;
+
+    try {
+      const res = await api.post<{ session_token: string; refresh_token: string; expires_at: number }>(
+        "/auth/refresh", { session_token: sessionToken, refresh_token: refreshToken }
+      );
+      localStorage.setItem("session_token", res.session_token);
+      localStorage.setItem("refresh_token", res.refresh_token);
+    } catch {
+      localStorage.clear();
+      setUser(null);
+    }
+  };
+
+  // Auto-refresh before expiry
+  useEffect(() => {
+    const stored = localStorage.getItem("session");
+    if (!stored) return;
+    const { expiresAt } = JSON.parse(stored);
+    const refreshIn = expiresAt - Date.now() - 5 * 60 * 1000; // 5 min before expiry
+    if (refreshIn <= 0) return;
+    const timer = setTimeout(tryRefresh, refreshIn);
+    return () => clearTimeout(timer);
+  }, [user]);
+
+  const saveSession = (res: AuthResponse) => {
+    localStorage.setItem("session_token", res.session_token);
+    localStorage.setItem("refresh_token", res.refresh_token);
+    localStorage.setItem("session", JSON.stringify({ user: res.user, expiresAt: res.expires_at }));
+    setUser(res.user);
+  };
 
   const login = async (email: string, password: string) => {
-    const res = await api.post<{ token: string; user: User }>("/auth/login", { email, password });
-    localStorage.setItem("token", res.token);
-    setToken(res.token);
-    setUser(res.user);
+    const res = await api.post<AuthResponse>("/auth/login", { email, password });
+    saveSession(res);
   };
 
   const register = async (email: string, username: string, password: string) => {
-    const res = await api.post<{ token: string; user: User }>("/auth/register", { email, username, password });
-    localStorage.setItem("token", res.token);
-    setToken(res.token);
-    setUser(res.user);
+    const res = await api.post<AuthResponse>("/auth/register", { email, username, password });
+    saveSession(res);
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
+  const logout = useCallback(async () => {
+    try { await api.post("/auth/logout"); } catch {}
+    localStorage.clear();
     setUser(null);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -2229,30 +2538,63 @@ export const useAuth = () => useContext(AuthContext);
 
 These will be minimal stubs to establish routing. Full UI implementation comes in Phase 7.
 
-`src/web/components/layout.tsx`:
+`src/web/components/layout.tsx` (shadcn/ui exclusively):
 ```tsx
 import { useAuth } from "../lib/auth";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Server, Network, Egg, LogOut, Settings, User } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <nav className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <a href="/" className="text-xl font-bold text-pink-400">Flamingo</a>
-          <a href="/" className="text-sm text-zinc-400 hover:text-zinc-100">Servers</a>
+    <div className="min-h-screen bg-background text-foreground dark">
+      <nav className="border-b px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <a href="/" className="text-xl font-bold text-primary mr-4">Flamingo</a>
+          <Button variant="ghost" size="sm" asChild>
+            <a href="/"><Server className="mr-2 h-4 w-4" /> Servers</a>
+          </Button>
           {user?.role === "admin" && (
             <>
-              <a href="/admin/nodes" className="text-sm text-zinc-400 hover:text-zinc-100">Nodes</a>
-              <a href="/admin/eggs" className="text-sm text-zinc-400 hover:text-zinc-100">Eggs</a>
+              <Button variant="ghost" size="sm" asChild>
+                <a href="/admin/nodes"><Network className="mr-2 h-4 w-4" /> Nodes</a>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <a href="/admin/eggs"><Egg className="mr-2 h-4 w-4" /> Eggs</a>
+              </Button>
             </>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-zinc-400">{user?.email}</span>
-          <button onClick={logout} className="text-sm text-zinc-400 hover:text-zinc-100">Logout</button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary/20 text-primary">
+                  {user?.username?.[0]?.toUpperCase() || "?"}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <div className="flex items-center gap-2 p-2">
+              <div className="text-sm font-medium">{user?.username}</div>
+              <div className="text-xs text-muted-foreground">{user?.email}</div>
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem><Settings className="mr-2 h-4 w-4" /> Settings</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout} className="text-destructive">
+              <LogOut className="mr-2 h-4 w-4" /> Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </nav>
       <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
     </div>
@@ -2260,12 +2602,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-`src/web/pages/dashboard.tsx`:
+`src/web/pages/dashboard.tsx` (shadcn/ui exclusively):
 ```tsx
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Server, Cpu, HardDrive, MemoryStick } from "lucide-react";
 
-interface Server {
+interface ServerItem {
   id: string;
   name: string;
   uuid: string;
@@ -2276,37 +2622,61 @@ interface Server {
 }
 
 export function Dashboard() {
-  const [servers, setServers] = useState<Server[]>([]);
+  const [servers, setServers] = useState<ServerItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<Server[]>("/servers").then(setServers);
+    api.get<ServerItem[]>("/servers").then(setServers).finally(() => setLoading(false));
   }, []);
 
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Your Servers</h1>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}><CardContent className="p-6"><Skeleton className="h-20" /></CardContent></Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Your Servers</h1>
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Your Servers</h1>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {servers.map((s) => (
-          <a
-            key={s.id}
-            href={`/server/${s.id}`}
-            className="block p-4 bg-zinc-900 rounded-lg border border-zinc-800 hover:border-pink-500/50 transition-colors"
-          >
-            <h3 className="font-semibold">{s.name}</h3>
-            <p className="text-sm text-zinc-400 mt-1">
-              {s.memory} MB RAM &middot; {s.cpu}% CPU &middot; {s.disk} MB Disk
-            </p>
-            <div className="mt-2">
-              <span className={`text-xs px-2 py-0.5 rounded ${
-                s.status === null ? "bg-green-900 text-green-300" : "bg-yellow-900 text-yellow-300"
-              }`}>
-                {s.status || "Active"}
-              </span>
-            </div>
+          <a key={s.id} href={`/server/${s.id}`}>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Server className="h-4 w-4 text-primary" />
+                    {s.name}
+                  </CardTitle>
+                  <Badge variant={s.status === null ? "default" : "secondary"}>
+                    {s.status || "Active"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1"><MemoryStick className="h-3 w-3" /> {s.memory} MB</span>
+                  <span className="flex items-center gap-1"><Cpu className="h-3 w-3" /> {s.cpu}%</span>
+                  <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> {s.disk} MB</span>
+                </div>
+              </CardContent>
+            </Card>
           </a>
         ))}
         {servers.length === 0 && (
-          <p className="text-zinc-500 col-span-full">No servers yet.</p>
+          <Card className="col-span-full">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Server className="h-12 w-12 mb-4 text-primary/30" />
+              <p>No servers yet.</p>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
@@ -2329,10 +2699,12 @@ function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
     try {
       if (isRegister) {
         await register(email, username, password);
@@ -2341,39 +2713,52 @@ function LoginPage() {
       }
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // All shadcn/ui components - import Card, Input, Label, Button, Alert from @/components/ui/*
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm p-6 bg-zinc-900 rounded-lg border border-zinc-800">
-        <h1 className="text-2xl font-bold text-center text-pink-400 mb-6">Flamingo</h1>
-        {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-        <input
-          type="email" placeholder="Email" value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-3 px-3 py-2 bg-zinc-800 rounded border border-zinc-700 text-sm"
-        />
-        {isRegister && (
-          <input
-            type="text" placeholder="Username" value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full mb-3 px-3 py-2 bg-zinc-800 rounded border border-zinc-700 text-sm"
-          />
-        )}
-        <input
-          type="password" placeholder="Password" value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-4 px-3 py-2 bg-zinc-800 rounded border border-zinc-700 text-sm"
-        />
-        <button type="submit" className="w-full py-2 bg-pink-600 hover:bg-pink-500 rounded font-medium text-sm">
-          {isRegister ? "Create Account" : "Sign In"}
-        </button>
-        <button type="button" onClick={() => setIsRegister(!isRegister)}
-          className="w-full mt-3 text-sm text-zinc-400 hover:text-zinc-100">
-          {isRegister ? "Already have an account?" : "Create an account"}
-        </button>
-      </form>
+    <div className="min-h-screen bg-background flex items-center justify-center dark">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl text-primary">Flamingo</CardTitle>
+          <CardDescription>{isRegister ? "Create your account" : "Sign in to your panel"}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" placeholder="admin@example.com" value={email}
+                onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            {isRegister && (
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input id="username" type="text" placeholder="username" value={username}
+                  onChange={(e) => setUsername(e.target.value)} required />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" placeholder="Min. 8 characters" value={password}
+                onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "..." : isRegister ? "Create Account" : "Sign In"}
+            </Button>
+            <Button type="button" variant="link" className="w-full" onClick={() => setIsRegister(!isRegister)}>
+              {isRegister ? "Already have an account?" : "Create an account"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -2423,10 +2808,15 @@ git add -A && git commit -m "feat: add React frontend with auth, layout, and das
 - Create: `src/web/components/console.tsx`
 - Create: `src/web/components/power-controls.tsx`
 
-**Step 1: Create console component `src/web/components/console.tsx`**
+**Step 1: Create console component `src/web/components/console.tsx`** (shadcn/ui)
 
 ```tsx
 import { useEffect, useRef, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Terminal } from "lucide-react";
 
 interface ConsoleProps {
   serverId: string;
@@ -2437,22 +2827,19 @@ export function Console({ serverId }: ConsoleProps) {
   const [command, setCommand] = useState("");
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    // First, get the websocket connection info
+    const sessionToken = localStorage.getItem("session_token");
     fetch(`/api/servers/${serverId}/websocket`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${sessionToken}` },
     })
       .then((res) => res.json())
       .then(({ token: wsToken, socket }) => {
         const ws = new WebSocket(socket);
         wsRef.current = ws;
 
-        ws.onopen = () => {
-          ws.send(JSON.stringify({ event: "auth", args: [wsToken] }));
-        };
+        ws.onopen = () => ws.send(JSON.stringify({ event: "auth", args: [wsToken] }));
 
         ws.onmessage = (e) => {
           const msg = JSON.parse(e.data);
@@ -2480,7 +2867,7 @@ export function Console({ serverId }: ConsoleProps) {
   }, [serverId]);
 
   useEffect(() => {
-    containerRef.current?.scrollTo(0, containerRef.current.scrollHeight);
+    scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
   }, [lines]);
 
   const sendCommand = (e: React.FormEvent) => {
@@ -2491,34 +2878,34 @@ export function Console({ serverId }: ConsoleProps) {
   };
 
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
-        <span className="text-sm font-medium">Console</span>
-        <span className={`text-xs px-2 py-0.5 rounded ${
-          connected ? "bg-green-900 text-green-300" : "bg-red-900 text-red-300"
-        }`}>
+    <Card>
+      <CardHeader className="py-3 flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Terminal className="h-4 w-4" /> Console
+        </CardTitle>
+        <Badge variant={connected ? "default" : "destructive"}>
           {connected ? "Connected" : "Disconnected"}
-        </span>
-      </div>
-      <div
-        ref={containerRef}
-        className="h-96 overflow-y-auto p-4 font-mono text-xs leading-relaxed text-zinc-300 bg-black/50"
-      >
-        {lines.map((line, i) => (
-          <div key={i} dangerouslySetInnerHTML={{ __html: line }} />
-        ))}
-      </div>
-      <form onSubmit={sendCommand} className="flex border-t border-zinc-800">
-        <span className="px-3 py-2 text-zinc-500 text-sm">$</span>
-        <input
-          type="text"
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-          placeholder="Type a command..."
-          className="flex-1 bg-transparent px-2 py-2 text-sm outline-none"
-        />
-      </form>
-    </div>
+        </Badge>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ScrollArea ref={scrollRef} className="h-96 bg-black/50 p-4">
+          <div className="font-mono text-xs leading-relaxed text-muted-foreground">
+            {lines.map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+        </ScrollArea>
+        <form onSubmit={sendCommand} className="flex items-center border-t px-3">
+          <span className="text-muted-foreground text-sm mr-2">$</span>
+          <Input
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            placeholder="Type a command..."
+            className="border-0 shadow-none focus-visible:ring-0 rounded-none"
+          />
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 ```
@@ -2749,12 +3136,12 @@ npx wrangler d1 create flamingo-db
 npx wrangler kv namespace create FLAMINGO_KV
 npx wrangler r2 bucket create flamingo-files
 npx wrangler secret put JWT_SECRET
-echo "Setup complete! Run 'npm run deploy' to deploy."
+echo "Setup complete! Run 'bun run deploy' to deploy."
 ```
 
 ### Task 10.2: First deploy verification
 
-Run: `npm run build && wrangler deploy`
+Run: `bun run build && wrangler deploy`
 Expected: Deploys successfully, accessible at workers.dev URL.
 
 ### Task 10.3: README and deployment docs
