@@ -129,6 +129,40 @@ authRoutes.post("/logout-all", async (c) => {
   return c.body(null, 204);
 });
 
+// POST /api/auth/api-keys — create an application API key (admin only)
+authRoutes.post("/api-keys", async (c) => {
+  const sessionId = c.req.header("Authorization")?.replace("Bearer ", "");
+  if (!sessionId) return c.json({ error: "Unauthorized" }, 401);
+  const session = await getSession(c.env.KV, sessionId);
+  if (!session) return c.json({ error: "Unauthorized" }, 401);
+  if (session.role !== "admin") return c.json({ error: "Admin access required" }, 403);
+
+  const body = await c.req.json() as { memo?: string };
+  const db = getDb(c.env.DB);
+
+  // Generate a token in papp_ format
+  const rawBytes = crypto.getRandomValues(new Uint8Array(32));
+  const rawToken = Array.from(rawBytes).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 43);
+  const token = `papp_${rawToken}`;
+
+  // Hash for storage
+  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const tokenHash = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+
+  const identifier = `flam_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
+
+  await db.insert(schema.apiKeys).values({
+    userId: session.userId,
+    identifier,
+    tokenHash,
+    memo: body.memo || "Wings configure token",
+  });
+
+  // Return the raw token — this is the ONLY time it's shown
+  return c.json({ token, identifier }, 201);
+});
+
 authRoutes.post("/change-password", zValidator("json", z.object({
   current_password: z.string(),
   new_password: z.string().min(8).max(128),
