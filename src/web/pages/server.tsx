@@ -146,25 +146,33 @@ function ConsoleTab({ serverId }: { serverId: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Get WebSocket token
-    api.get<{ token: string; socket: string }>(`/servers/${serverId}/websocket`).then(({ token, socket }) => {
-      const ws = new WebSocket(socket);
+    let cancelled = false;
+
+    // Step 1: Get a console ticket (authenticated via session token)
+    api.get<{ ticket: string }>(`/servers/${serverId}/console-ticket`).then(({ ticket }) => {
+      if (cancelled) return;
+
+      // Step 2: Open WebSocket to the DO proxy via ticket
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(
+        `${protocol}//${window.location.host}/api/servers/${serverId}/console?ticket=${ticket}`
+      );
       wsRef.current = ws;
 
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ event: "auth", args: [token] }));
-      };
+      ws.onopen = () => setConnected(true);
 
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
           if (msg.event === "auth success") {
-            setConnected(true);
+            // Wings auth confirmed through the DO relay
             ws.send(JSON.stringify({ event: "send logs" }));
           } else if (msg.event === "console output") {
             setLines((prev) => [...prev.slice(-500), ...msg.args]);
           } else if (msg.event === "status") {
             setLines((prev) => [...prev, `[Status] ${msg.args[0]}`]);
+          } else if (msg.event === "daemon error") {
+            setLines((prev) => [...prev, `[Error] ${msg.args?.[0] || "Connection lost"}`]);
           }
         } catch {}
       };
@@ -172,7 +180,10 @@ function ConsoleTab({ serverId }: { serverId: string }) {
       ws.onclose = () => setConnected(false);
     });
 
-    return () => { wsRef.current?.close(); };
+    return () => {
+      cancelled = true;
+      wsRef.current?.close();
+    };
   }, [serverId]);
 
   useEffect(() => {
