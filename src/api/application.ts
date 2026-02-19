@@ -61,7 +61,7 @@ applicationRoutes.get("/nodes/:id/configuration", async (c) => {
   // Return Wings-compatible configuration JSON
   return c.json({
     debug: false,
-    uuid: node.id,
+    uuid: String(node.id),
     token_id: node.tokenId,
     token: node.token,
     api: {
