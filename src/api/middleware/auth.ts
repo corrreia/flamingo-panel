@@ -2,12 +2,18 @@ import { createMiddleware } from "hono/factory";
 import type { Env } from "../../env";
 import { getSession, type Session } from "../../lib/auth";
 
-// Extend Hono context with session
+export type AuthUser = {
+  id: string;
+  email: string;
+  role: "admin" | "user";
+};
+
 type AuthEnv = {
   Bindings: Env;
   Variables: {
     session: Session;
     sessionId: string;
+    user: AuthUser;
   };
 };
 
@@ -26,13 +32,18 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
 
   c.set("session", session);
   c.set("sessionId", sessionId);
+  c.set("user", {
+    id: session.userId,
+    email: session.email,
+    role: session.role,
+  });
   await next();
 });
 
 // Middleware that requires admin role
 export const requireAdmin = createMiddleware<AuthEnv>(async (c, next) => {
-  const session = c.get("session");
-  if (!session || session.role !== "admin") {
+  const user = c.get("user");
+  if (!user || user.role !== "admin") {
     return c.json({ error: "Admin access required" }, 403);
   }
   await next();
