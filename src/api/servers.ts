@@ -227,8 +227,8 @@ serverRoutes.post("/:id/command", zValidator("json", z.object({
   return c.body(null, 204);
 });
 
-// Get WebSocket token for console
-serverRoutes.get("/:id/websocket", async (c) => {
+// Issue a short-lived console ticket (authenticated via session)
+serverRoutes.get("/:id/console-ticket", async (c) => {
   const user = c.get("user");
   const db = getDb(c.env.DB);
 
@@ -251,7 +251,6 @@ serverRoutes.get("/:id/websocket", async (c) => {
     WS_PERMISSIONS.POWER_RESTART,
     WS_PERMISSIONS.BACKUP_READ,
   ];
-
   if (user.role === "admin") {
     permissions.push(
       WS_PERMISSIONS.ADMIN_ERRORS,
@@ -260,65 +259,62 @@ serverRoutes.get("/:id/websocket", async (c) => {
     );
   }
 
-  const token = await signWingsWebsocketToken(
-    { user_uuid: user.id, server_uuid: server.uuid, permissions },
-    node.token,
-  );
-
-  // WebSocket URL goes through the tunnel
-  return c.json({
-    token,
-    socket: `wss://${node.fqdn}/api/servers/${server.uuid}/ws`,
-  });
-});
-
-// WebSocket console proxy via Durable Object
-serverRoutes.get("/:id/console", async (c) => {
-  const user = c.get("user");
-  const db = getDb(c.env.DB);
-
-  const server = await db.select().from(schema.servers)
-    .where(eq(schema.servers.id, c.req.param("id"))).get();
-  if (!server) return c.json({ error: "Server not found" }, 404);
-  if (user.role !== "admin" && server.ownerId !== user.id) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
-
-  const node = await db.select().from(schema.nodes)
-    .where(eq(schema.nodes.id, server.nodeId)).get();
-  if (!node) return c.json({ error: "Node not found" }, 404);
-
-  const permissions = [
-    WS_PERMISSIONS.CONNECT,
-    WS_PERMISSIONS.SEND_COMMAND,
-    WS_PERMISSIONS.POWER_START,
-    WS_PERMISSIONS.POWER_STOP,
-    WS_PERMISSIONS.POWER_RESTART,
-    WS_PERMISSIONS.BACKUP_READ,
-  ];
-  if (user.role === "admin") {
-    permissions.push(WS_PERMISSIONS.ADMIN_ERRORS, WS_PERMISSIONS.ADMIN_INSTALL);
-  }
-
   const wingsToken = await signWingsWebsocketToken(
     { user_uuid: user.id, server_uuid: server.uuid, permissions },
     node.token,
   );
 
-  const wingsUrl = `wss://${node.fqdn}/api/servers/${server.uuid}/ws`;
+  // Create one-time ticket stored in KV (30s TTL)
+  const ticket = crypto.randomUUID();
+  await c.env.KV.put(`console-ticket:${ticket}`, JSON.stringify({
+    serverId: server.id,
+    serverUuid: server.uuid,
+    userId: user.id,
+    wingsUrl: `wss://${node.fqdn}/api/servers/${server.uuid}/ws`,
+    wingsToken,
+  }), { expirationTtl: 30 });
 
-  // Get or create Durable Object for this server
-  const doId = c.env.CONSOLE_SESSION.idFromName(server.uuid);
+  return c.json({ ticket });
+});
+
+// WebSocket console proxy via Durable Object (ticket-authenticated)
+serverRoutes.get("/:id/console", async (c) => {
+  const ticket = c.req.query("ticket");
+  if (!ticket) return c.json({ error: "Missing ticket" }, 401);
+
+  // Validate and consume the one-time ticket
+  const ticketKey = `console-ticket:${ticket}`;
+  const ticketData = await c.env.KV.get(ticketKey);
+  if (!ticketData) return c.json({ error: "Invalid or expired ticket" }, 401);
+
+  // Delete immediately (one-time use)
+  await c.env.KV.delete(ticketKey);
+
+  const data = JSON.parse(ticketData) as {
+    serverId: string;
+    serverUuid: string;
+    userId: string;
+    wingsUrl: string;
+    wingsToken: string;
+  };
+
+  // Verify the URL param matches the ticket's server
+  if (data.serverId !== c.req.param("id")) {
+    return c.json({ error: "Ticket/server mismatch" }, 403);
+  }
+
+  // Forward WebSocket upgrade to the DO
+  const doId = c.env.CONSOLE_SESSION.idFromName(data.serverUuid);
   const stub = c.env.CONSOLE_SESSION.get(doId);
 
-  // Configure the DO with Wings connection info
-  await stub.fetch(new Request("https://internal/connect", {
+  return stub.fetch(new Request("https://internal/connect", {
     method: "POST",
-    body: JSON.stringify({ wingsUrl, wingsToken }),
-  }));
-
-  // Proxy the WebSocket upgrade to the DO
-  return stub.fetch(new Request("https://internal/websocket", {
     headers: c.req.raw.headers,
+    body: JSON.stringify({
+      wingsUrl: data.wingsUrl,
+      wingsToken: data.wingsToken,
+      userId: data.userId,
+      serverId: data.serverId,
+    }),
   }));
 });
