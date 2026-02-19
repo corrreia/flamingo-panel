@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "bun run build:web && wrangler dev",
     "dev:web": "vite dev --config vite.config.ts",
     "build:web": "vite build --config vite.config.ts",
     "build": "bun run build:web",
@@ -11,7 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:dev": "wrangler d1 migrations apply flamingo-db --local",
     "db:migrate:prod": "wrangler d1 migrations apply flamingo-db --remote",
-    "db:studio": "drizzle-kit studio",
+    "db:studio": "LOCAL=1 drizzle-kit studio",
     "test": "vitest"
   },
   "devDependencies": {

@@ -1,25 +1,31 @@
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig } from "drizzle-kit";
-import fs from "node:fs";
-import path from "node:path";
 
-// Find the local D1 SQLite file created by wrangler/miniflare
-function findLocalD1(): string {
-  const d1Dir = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
-  if (!fs.existsSync(d1Dir)) {
-    return d1Dir + "/placeholder.sqlite"; // will error clearly if missing
-  }
-  const files = fs.readdirSync(d1Dir).filter(f => f.endsWith(".sqlite"));
-  if (files.length === 0) {
-    throw new Error("No local D1 database found. Run `bun run db:migrate:dev` first.");
-  }
-  return path.join(d1Dir, files[0]);
+function findLocalD1Url(): string {
+  const dir = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
+  const file = readdirSync(dir).find((f) => f.endsWith(".sqlite"));
+  if (!file)
+    throw new Error("Local D1 not found — run `bun run dev` first.");
+  return join(dir, file);
 }
 
 export default defineConfig({
-  schema: "./src/db/schema.ts",
   out: "./migrations",
+  schema: "./src/db/schema.ts",
   dialect: "sqlite",
-  dbCredentials: {
-    url: findLocalD1(),
-  },
+  ...(process.env.LOCAL
+    ? {
+        // Local: point at the wrangler D1 SQLite file for Drizzle Studio
+        dbCredentials: { url: findLocalD1Url() },
+      }
+    : {
+        // Production: apply migrations via D1 HTTP API
+        driver: "d1-http",
+        dbCredentials: {
+          accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
+          databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID!,
+          token: process.env.CLOUDFLARE_API_TOKEN!,
+        },
+      }),
 });
