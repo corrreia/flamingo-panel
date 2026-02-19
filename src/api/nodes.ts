@@ -13,9 +13,7 @@ nodeRoutes.use("*", requireAuth);
 
 const createNodeSchema = z.object({
   name: z.string().min(1).max(255),
-  fqdn: z.string().min(1),  // Cloudflare Tunnel hostname
-  tokenId: z.string().min(1),
-  token: z.string().min(1),
+  fqdn: z.string().default(""),  // filled in later after cloudflared setup
   memory: z.number().int().min(0).default(0),
   memoryOverallocate: z.number().int().default(0),
   disk: z.number().int().min(0).default(0),
@@ -53,17 +51,38 @@ nodeRoutes.get("/:id", requireAdmin, async (c) => {
   return c.json({ ...node, token: undefined, stats });
 });
 
-// Create node
+// Create node — auto-generates tokenId + token for Wings auth
 nodeRoutes.post("/", requireAdmin, zValidator("json", createNodeSchema), async (c) => {
   const data = c.req.valid("json");
   const db = getDb(c.env.DB);
 
-  const node = await db.insert(schema.nodes).values(data).returning().get();
-  return c.json(node, 201);
+  const tokenId = `node_${crypto.randomUUID().replace(/-/g, "")}`;
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+
+  const node = await db.insert(schema.nodes).values({
+    ...data,
+    tokenId,
+    token,
+  }).returning().get();
+
+  return c.json({
+    ...node,
+    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token <APP_API_TOKEN> --node ${node.id}`,
+  }, 201);
 });
 
+const updateNodeSchema = z.object({
+  name: z.string().min(1).max(255),
+  fqdn: z.string(),
+  memory: z.number().int().min(0),
+  memoryOverallocate: z.number().int(),
+  disk: z.number().int().min(0),
+  diskOverallocate: z.number().int(),
+}).partial();
+
 // Update node
-nodeRoutes.put("/:id", requireAdmin, zValidator("json", createNodeSchema.partial()), async (c) => {
+nodeRoutes.put("/:id", requireAdmin, zValidator("json", updateNodeSchema), async (c) => {
   const db = getDb(c.env.DB);
   const data = c.req.valid("json");
   const node = await db.update(schema.nodes)
