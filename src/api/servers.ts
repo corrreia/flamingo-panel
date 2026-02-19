@@ -12,6 +12,61 @@ export const serverRoutes = new Hono<{ Bindings: Env; Variables: { user: AuthUse
 
 serverRoutes.use("*", requireAuth);
 
+// Build the Wings-compatible server creation/install payload
+function buildWingsPayload(
+  server: typeof schema.servers.$inferSelect,
+  egg: typeof schema.eggs.$inferSelect,
+  environment: Record<string, string>,
+) {
+  return {
+    uuid: server.uuid,
+    start_on_completion: false,
+    environment,
+    settings: {
+      uuid: server.uuid,
+      meta: {
+        name: server.name,
+        description: server.description || "",
+      },
+      suspended: false,
+      invocation: server.startup,
+      skip_egg_scripts: false,
+      build: {
+        memory_limit: server.memory,
+        swap: server.swap,
+        io_weight: server.io,
+        cpu_limit: server.cpu,
+        threads: server.threads || null,
+        disk_space: server.disk,
+        oom_killer: server.oomKiller === 1,
+      },
+      container: {
+        image: server.image,
+        requires_rebuild: false,
+      },
+      allocations: {
+        default: {
+          ip: server.defaultAllocationIp,
+          port: server.defaultAllocationPort,
+        },
+        mappings: {
+          [server.defaultAllocationIp]: [server.defaultAllocationPort],
+        },
+      },
+      mounts: [],
+      egg: {
+        id: egg.id,
+        file_denylist: JSON.parse(egg.fileDenylist || "[]"),
+      },
+    },
+    process_configuration: {
+      startup: JSON.parse(egg.configStartup || "{}"),
+      stop: { type: "command", value: egg.stopCommand },
+      configs: JSON.parse(egg.configFiles || "[]"),
+    },
+  };
+}
+
 // Create server (admin only)
 serverRoutes.post("/", zValidator("json", z.object({
   name: z.string().min(1).max(255),
@@ -80,54 +135,20 @@ serverRoutes.post("/", zValidator("json", z.object({
   }
 
   // Tell Wings to install the server
+  const eggVarsList = await db.select().from(schema.eggVariables)
+    .where(eq(schema.eggVariables.eggId, data.eggId)).all();
+  const environment: Record<string, string> = {};
+  for (const ev of eggVarsList) {
+    environment[ev.envVariable] = data.variables?.[ev.envVariable] || ev.defaultValue || "";
+  }
+  // Always include startup command variables
+  environment["STARTUP"] = server.startup;
+  environment["P_SERVER_LOCATION"] = "home";
+  environment["P_SERVER_UUID"] = server.uuid;
+
   try {
     const client = new WingsClient(node);
-    await client.createServer({
-      uuid: server.uuid,
-      start_on_completion: false,
-      settings: {
-        uuid: server.uuid,
-        meta: {
-          name: server.name,
-          description: server.description || "",
-        },
-        suspended: false,
-        invocation: server.startup,
-        skip_egg_scripts: false,
-        build: {
-          memory_limit: server.memory,
-          swap: server.swap,
-          io_weight: server.io,
-          cpu_limit: server.cpu,
-          threads: server.threads || null,
-          disk_space: server.disk,
-          oom_killer: server.oomKiller === 1,
-        },
-        container: {
-          image: server.image,
-          requires_rebuild: false,
-        },
-        allocations: {
-          default: {
-            ip: server.defaultAllocationIp,
-            port: server.defaultAllocationPort,
-          },
-          mappings: {
-            [server.defaultAllocationIp]: [server.defaultAllocationPort],
-          },
-        },
-        mounts: [],
-        egg: {
-          id: egg.id,
-          file_denylist: JSON.parse(egg.fileDenylist || "[]"),
-        },
-      },
-      process_configuration: {
-        startup: JSON.parse(egg.configStartup || "{}"),
-        stop: { type: "command", value: egg.stopCommand },
-        configs: JSON.parse(egg.configFiles || "[]"),
-      },
-    });
+    await client.createServer(buildWingsPayload(server, egg, environment));
   } catch {
     // Wings might be offline, server record is still created
   }
@@ -177,6 +198,44 @@ serverRoutes.get("/:id", async (c) => {
   }
 
   return c.json({ ...server, resources });
+});
+
+// Reinstall server on Wings (re-sends the full create payload)
+serverRoutes.post("/:id/reinstall", async (c) => {
+  const user = c.get("user");
+  if (user.role !== "admin") return c.json({ error: "Forbidden" }, 403);
+
+  const db = getDb(c.env.DB);
+  const server = await db.select().from(schema.servers)
+    .where(eq(schema.servers.id, c.req.param("id"))).get();
+  if (!server) return c.json({ error: "Server not found" }, 404);
+
+  const node = await db.select().from(schema.nodes)
+    .where(eq(schema.nodes.id, server.nodeId)).get();
+  if (!node?.url) return c.json({ error: "Node not configured" }, 400);
+
+  const egg = await db.select().from(schema.eggs)
+    .where(eq(schema.eggs.id, server.eggId!)).get();
+  if (!egg) return c.json({ error: "Egg not found" }, 404);
+
+  // Build environment from server variables
+  const serverVars = await db.select().from(schema.serverVariables)
+    .where(eq(schema.serverVariables.serverId, server.id)).all();
+  const eggVars = await db.select().from(schema.eggVariables)
+    .where(eq(schema.eggVariables.eggId, egg.id)).all();
+
+  const environment: Record<string, string> = {};
+  for (const ev of eggVars) {
+    const sv = serverVars.find(s => s.variableId === ev.id);
+    environment[ev.envVariable] = sv?.variableValue || ev.defaultValue || "";
+  }
+  environment["STARTUP"] = server.startup;
+  environment["P_SERVER_LOCATION"] = "home";
+  environment["P_SERVER_UUID"] = server.uuid;
+
+  const client = new WingsClient(node);
+  await client.createServer(buildWingsPayload(server, egg, environment));
+  return c.json({ ok: true });
 });
 
 // Power actions
@@ -264,7 +323,7 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
     node.token,
   );
 
-  // Create one-time ticket stored in KV (30s TTL)
+  // Create one-time ticket stored in KV (60s TTL — KV minimum)
   const ticket = crypto.randomUUID();
   await c.env.KV.put(`console-ticket:${ticket}`, JSON.stringify({
     serverId: server.id,
@@ -272,7 +331,7 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
     userId: user.id,
     wingsUrl: `${node.url.replace(/^http/, "ws").replace(/\/+$/, "")}/api/servers/${server.uuid}/ws`,
     wingsToken,
-  }), { expirationTtl: 30 });
+  }), { expirationTtl: 60 });
 
   return c.json({ ticket });
 });

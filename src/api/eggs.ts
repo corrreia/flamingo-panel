@@ -78,7 +78,7 @@ eggRoutes.post("/import", requireAdmin, async (c) => {
         defaultValue: v.default_value || "",
         userViewable: v.user_viewable ? 1 : 0,
         userEditable: v.user_editable ? 1 : 0,
-        rules: v.rules || "required|string",
+        rules: Array.isArray(v.rules) ? v.rules.join("|") : (v.rules || "required|string"),
         sortOrder: v.sort || 0,
       });
     }
