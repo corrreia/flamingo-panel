@@ -9,7 +9,7 @@ import { Skeleton } from "@web/components/ui/skeleton";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   ArrowLeft, Wifi, WifiOff, Cpu, HardDrive, MemoryStick,
-  Server, Globe, Save, RefreshCw,
+  Server, Globe, Save, RefreshCw, Terminal, Copy, Check,
 } from "lucide-react";
 
 interface NodeDetail {
@@ -54,6 +54,11 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
   const [memory, setMemory] = useState("0");
   const [disk, setDisk] = useState("0");
 
+  // Reconfigure
+  const [configureCommand, setConfigureCommand] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [commandCopied, setCommandCopied] = useState(false);
+
   const load = () => {
     setLoading(true);
     api.get<NodeDetail>(`/nodes/${nodeId}`)
@@ -89,6 +94,25 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleReconfigure = async () => {
+    setRegenerating(true);
+    setError("");
+    try {
+      const res = await api.post<{ configureCommand: string }>(`/nodes/${nodeId}/reconfigure`);
+      setConfigureCommand(res.configureCommand);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCommandCopied(true);
+    setTimeout(() => setCommandCopied(false), 2000);
   };
 
   if (loading) {
@@ -210,6 +234,45 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
               <span className="text-muted-foreground">Updated</span>
               <span>{new Date(node.updatedAt).toLocaleString()}</span>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Reconfigure */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Terminal className="h-4 w-4" /> Reconfigure Wings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Generate a new one-time <code>wings configure</code> command. Use this if you rebuilt the Wings machine or need to re-sync the configuration.
+            </p>
+            {configureCommand ? (
+              <div className="space-y-3">
+                <div className="rounded-md bg-muted p-3 font-mono text-xs break-all select-all">
+                  {configureCommand}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(configureCommand)}
+                >
+                  {commandCopied
+                    ? <><Check className="h-4 w-4 mr-2" /> Copied</>
+                    : <><Copy className="h-4 w-4 mr-2" /> Copy Command</>
+                  }
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  This token is one-time use and will be consumed when Wings configures. Remember to restart Wings after running the command.
+                </p>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={handleReconfigure} disabled={regenerating}>
+                <Terminal className="h-4 w-4 mr-2" />
+                {regenerating ? "Generating..." : "Generate Configure Command"}
+              </Button>
+            )}
           </CardContent>
         </Card>
 

@@ -117,6 +117,34 @@ nodeRoutes.put("/:id", requireAdmin, zValidator("json", updateNodeSchema), async
   return c.json(node);
 });
 
+// Regenerate configure command — creates a new one-time API key
+nodeRoutes.post("/:id/reconfigure", requireAdmin, async (c) => {
+  const db = getDb(c.env.DB);
+  const user = c.get("user" as never) as { id: string };
+  const node = await db.select().from(schema.nodes)
+    .where(eq(schema.nodes.id, Number(c.req.param("id")))).get();
+  if (!node) return c.json({ error: "Node not found" }, 404);
+
+  const rawBytes = crypto.getRandomValues(new Uint8Array(32));
+  const rawToken = Array.from(rawBytes).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 43);
+  const apiToken = `papp_${rawToken}`;
+
+  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(apiToken));
+  const tokenHash = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+
+  await db.insert(schema.apiKeys).values({
+    userId: user.id,
+    identifier: `flam_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`,
+    tokenHash,
+    memo: `node-configure:${node.id}`,
+  });
+
+  return c.json({
+    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id}`,
+  });
+});
+
 // Delete node
 nodeRoutes.delete("/:id", requireAdmin, async (c) => {
   const db = getDb(c.env.DB);
