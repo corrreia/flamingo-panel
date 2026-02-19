@@ -5,7 +5,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@web/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@web/components/ui/avatar";
-import { Server, Network, Egg, LogOut, Settings } from "lucide-react";
+import { Server, Network, Egg, LogOut, Settings, Plus } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -25,6 +25,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Button>
               <Button variant="ghost" size="sm" asChild>
                 <a href="/admin/eggs"><Egg className="mr-2 h-4 w-4" /> Eggs</a>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <a href="/admin/create-server"><Plus className="mr-2 h-4 w-4" /> Create Server</a>
               </Button>
             </>
           )}

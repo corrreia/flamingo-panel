@@ -12,6 +12,129 @@ export const serverRoutes = new Hono<{ Bindings: Env; Variables: { user: AuthUse
 
 serverRoutes.use("*", requireAuth);
 
+// Create server (admin only)
+serverRoutes.post("/", zValidator("json", z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  nodeId: z.string().min(1),
+  ownerId: z.string().min(1),
+  eggId: z.string().min(1),
+  memory: z.number().int().min(64).default(512),
+  disk: z.number().int().min(128).default(1024),
+  cpu: z.number().int().min(10).default(100),
+  swap: z.number().int().default(0),
+  io: z.number().int().default(500),
+  defaultAllocationPort: z.number().int().min(1).max(65535).default(25565),
+  startup: z.string().optional(),
+  image: z.string().optional(),
+  variables: z.record(z.string()).optional(),
+})), async (c) => {
+  const user = c.get("user");
+  if (user.role !== "admin") return c.json({ error: "Forbidden" }, 403);
+
+  const data = c.req.valid("json");
+  const db = getDb(c.env.DB);
+
+  // Validate node exists
+  const node = await db.select().from(schema.nodes)
+    .where(eq(schema.nodes.id, data.nodeId)).get();
+  if (!node) return c.json({ error: "Node not found" }, 404);
+
+  // Validate egg exists
+  const egg = await db.select().from(schema.eggs)
+    .where(eq(schema.eggs.id, data.eggId)).get();
+  if (!egg) return c.json({ error: "Egg not found" }, 404);
+
+  // Validate owner exists
+  const owner = await db.select().from(schema.users)
+    .where(eq(schema.users.id, data.ownerId)).get();
+  if (!owner) return c.json({ error: "User not found" }, 404);
+
+  const server = await db.insert(schema.servers).values({
+    name: data.name,
+    description: data.description || "",
+    nodeId: data.nodeId,
+    ownerId: data.ownerId,
+    eggId: data.eggId,
+    memory: data.memory,
+    disk: data.disk,
+    cpu: data.cpu,
+    swap: data.swap,
+    io: data.io,
+    defaultAllocationPort: data.defaultAllocationPort,
+    startup: data.startup || egg.startup,
+    image: data.image || egg.dockerImage,
+  }).returning().get();
+
+  // Save egg variables with defaults
+  if (data.variables || egg) {
+    const eggVars = await db.select().from(schema.eggVariables)
+      .where(eq(schema.eggVariables.eggId, data.eggId)).all();
+    for (const ev of eggVars) {
+      await db.insert(schema.serverVariables).values({
+        serverId: server.id,
+        variableId: ev.id,
+        variableValue: data.variables?.[ev.envVariable] || ev.defaultValue || "",
+      });
+    }
+  }
+
+  // Tell Wings to install the server
+  try {
+    const client = new WingsClient(node);
+    await client.createServer({
+      uuid: server.uuid,
+      start_on_completion: false,
+      settings: {
+        uuid: server.uuid,
+        meta: {
+          name: server.name,
+          description: server.description || "",
+        },
+        suspended: false,
+        invocation: server.startup,
+        skip_egg_scripts: false,
+        build: {
+          memory_limit: server.memory,
+          swap: server.swap,
+          io_weight: server.io,
+          cpu_limit: server.cpu,
+          threads: server.threads || null,
+          disk_space: server.disk,
+          oom_killer: server.oomKiller === 1,
+        },
+        container: {
+          image: server.image,
+          requires_rebuild: false,
+        },
+        allocations: {
+          default: {
+            ip: server.defaultAllocationIp,
+            port: server.defaultAllocationPort,
+          },
+          mappings: {
+            [server.defaultAllocationIp]: [server.defaultAllocationPort],
+          },
+        },
+        mounts: [],
+        egg: {
+          id: egg.id,
+          file_denylist: JSON.parse(egg.fileDenylist || "[]"),
+        },
+      },
+      process_configuration: {
+        startup: JSON.parse(egg.configStartup || "{}"),
+        stop: { type: "command", value: egg.stopCommand },
+        configs: JSON.parse(egg.configFiles || "[]"),
+      },
+    });
+  } catch {
+    // Wings might be offline, server record is still created
+  }
+
+  return c.json(server, 201);
+});
+
 // List servers (admin sees all, user sees own)
 serverRoutes.get("/", async (c) => {
   const user = c.get("user");

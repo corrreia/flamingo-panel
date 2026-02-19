@@ -3,6 +3,9 @@ import { Layout } from "@web/components/layout";
 import { LoginPage } from "@web/pages/login";
 import { Dashboard } from "@web/pages/dashboard";
 import { ServerPage } from "@web/pages/server";
+import { NodesPage } from "@web/pages/admin/nodes";
+import { EggsPage } from "@web/pages/admin/eggs";
+import { CreateServerPage } from "@web/pages/admin/create-server";
 
 function Router() {
   const { user, loading } = useAuth();
@@ -27,6 +30,30 @@ function Router() {
     return (
       <Layout>
         <ServerPage serverId={id} />
+      </Layout>
+    );
+  }
+
+  if (path === "/admin/nodes") {
+    return (
+      <Layout>
+        <NodesPage />
+      </Layout>
+    );
+  }
+
+  if (path === "/admin/eggs") {
+    return (
+      <Layout>
+        <EggsPage />
+      </Layout>
+    );
+  }
+
+  if (path === "/admin/create-server") {
+    return (
+      <Layout>
+        <CreateServerPage />
       </Layout>
     );
   }

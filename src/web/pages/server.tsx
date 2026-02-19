@@ -13,7 +13,7 @@ import {
 import {
   Play, Square, RotateCcw, Skull, Terminal, FolderOpen,
   Settings, Cpu, MemoryStick, HardDrive, Wifi, WifiOff,
-  File, Folder, ChevronRight, ArrowLeft,
+  File, Folder, ChevronRight, ArrowLeft, Save, X,
 } from "lucide-react";
 
 interface ServerDetail {
@@ -218,14 +218,34 @@ function ConsoleTab({ serverId }: { serverId: string }) {
   );
 }
 
+const TEXT_EXTENSIONS = new Set([
+  ".txt", ".log", ".cfg", ".conf", ".ini", ".yml", ".yaml", ".json",
+  ".xml", ".properties", ".toml", ".env", ".sh", ".bash", ".bat",
+  ".cmd", ".ps1", ".py", ".js", ".ts", ".lua", ".java", ".md", ".csv",
+]);
+
+function isTextFile(name: string): boolean {
+  const ext = name.substring(name.lastIndexOf(".")).toLowerCase();
+  return TEXT_EXTENSIONS.has(ext);
+}
+
 function FilesTab({ serverId }: { serverId: string }) {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentDir, setCurrentDir] = useState("/");
   const [loading, setLoading] = useState(true);
 
+  // Editor state
+  const [editingFile, setEditingFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState("");
+  const [originalContent, setOriginalContent] = useState("");
+  const [loadingFile, setLoadingFile] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"" | "saved" | "error">("");
+
   const loadDir = useCallback((dir: string) => {
     setLoading(true);
     setCurrentDir(dir);
+    setEditingFile(null);
     api.get<FileEntry[]>(`/servers/${serverId}/files/list?directory=${encodeURIComponent(dir)}`)
       .then(setFiles)
       .finally(() => setLoading(false));
@@ -237,6 +257,104 @@ function FilesTab({ serverId }: { serverId: string }) {
     const parent = currentDir.replace(/\/[^/]+\/?$/, "") || "/";
     loadDir(parent);
   };
+
+  const openFile = async (fileName: string) => {
+    const filePath = currentDir === "/" ? `/${fileName}` : `${currentDir}/${fileName}`;
+    setLoadingFile(true);
+    setSaveStatus("");
+    try {
+      const token = localStorage.getItem("session_token");
+      const res = await fetch(`/api/servers/${serverId}/files/contents?file=${encodeURIComponent(filePath)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load file");
+      const text = await res.text();
+      setFileContent(text);
+      setOriginalContent(text);
+      setEditingFile(filePath);
+    } catch {
+      alert("Failed to open file");
+    } finally {
+      setLoadingFile(false);
+    }
+  };
+
+  const saveFile = async () => {
+    if (!editingFile) return;
+    setSaving(true);
+    setSaveStatus("");
+    try {
+      const token = localStorage.getItem("session_token");
+      const res = await fetch(`/api/servers/${serverId}/files/write?file=${encodeURIComponent(editingFile)}`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "text/plain",
+        },
+        body: fileContent,
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setOriginalContent(fileContent);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeEditor = () => {
+    if (fileContent !== originalContent) {
+      if (!confirm("You have unsaved changes. Close anyway?")) return;
+    }
+    setEditingFile(null);
+  };
+
+  // File editor view
+  if (editingFile) {
+    const fileName = editingFile.split("/").pop() || editingFile;
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={closeEditor}>
+                <X className="h-4 w-4" />
+              </Button>
+              <File className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">{fileName}</CardTitle>
+              <Badge variant="secondary" className="font-mono text-xs">{editingFile}</Badge>
+              {fileContent !== originalContent && (
+                <Badge variant="default" className="text-xs">Modified</Badge>
+              )}
+              {saveStatus === "saved" && (
+                <Badge variant="secondary" className="text-xs text-green-500">Saved</Badge>
+              )}
+              {saveStatus === "error" && (
+                <Badge variant="destructive" className="text-xs">Save failed</Badge>
+              )}
+            </div>
+            <Button size="sm" onClick={saveFile} disabled={saving || fileContent === originalContent}>
+              <Save className="h-4 w-4 mr-1" />
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingFile ? (
+            <Skeleton className="h-80" />
+          ) : (
+            <textarea
+              value={fileContent}
+              onChange={(e) => { setFileContent(e.target.value); setSaveStatus(""); }}
+              className="w-full h-96 rounded-md border bg-zinc-950 p-3 font-mono text-xs text-zinc-300 resize-y focus:outline-none focus:ring-2 focus:ring-primary"
+              spellCheck={false}
+            />
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -267,8 +385,14 @@ function FilesTab({ serverId }: { serverId: string }) {
               {files.map((f) => (
                 <TableRow
                   key={f.name}
-                  className={f.directory ? "cursor-pointer hover:bg-accent" : ""}
-                  onClick={() => f.directory && loadDir(currentDir === "/" ? `/${f.name}` : `${currentDir}/${f.name}`)}
+                  className={f.directory || isTextFile(f.name) ? "cursor-pointer hover:bg-accent" : ""}
+                  onClick={() => {
+                    if (f.directory) {
+                      loadDir(currentDir === "/" ? `/${f.name}` : `${currentDir}/${f.name}`);
+                    } else if (isTextFile(f.name)) {
+                      openFile(f.name);
+                    }
+                  }}
                 >
                   <TableCell className="flex items-center gap-2">
                     {f.directory ? <Folder className="h-4 w-4 text-primary" /> : <File className="h-4 w-4 text-muted-foreground" />}
