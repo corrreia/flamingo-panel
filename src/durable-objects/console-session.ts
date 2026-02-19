@@ -1,37 +1,60 @@
 import { DurableObject } from "cloudflare:workers";
 
-interface ConsoleSessionState {
+interface ConnectParams {
   wingsUrl: string;
   wingsToken: string;
+  userId: string;
+  serverId: string;
 }
 
 export class ConsoleSession extends DurableObject {
   private wingsSocket: WebSocket | null = null;
-  private clientSockets: Set<WebSocket> = new Set();
+  private buffer: string[] = [];
+  private static readonly BUFFER_SIZE = 200;
+
+  constructor(ctx: DurableObjectState, env: unknown) {
+    super(ctx, env);
+    ctx.blockConcurrencyWhile(async () => {
+      ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          event TEXT NOT NULL,
+          data TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+    });
+  }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/connect") {
-      // Initialize the session with Wings connection details
-      const body = await request.json() as ConsoleSessionState;
-      this.ctx.storage.put("wingsUrl", body.wingsUrl);
-      this.ctx.storage.put("wingsToken", body.wingsToken);
-      return new Response("ok");
-    }
+    if (url.pathname === "/connect" && request.method === "POST") {
+      const params = await request.json() as ConnectParams;
 
-    if (url.pathname === "/websocket") {
-      // Client WebSocket upgrade
+      // Accept the WebSocket from the client side of the pair
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
-      this.ctx.acceptWebSocket(server);
-      this.clientSockets.add(server);
+      // Tag with user info for identification
+      this.ctx.acceptWebSocket(server, [params.userId, params.serverId]);
+
+      // Send buffered lines to the new client immediately
+      for (const line of this.buffer) {
+        server.send(line);
+      }
 
       // Connect to Wings if not already connected
       if (!this.wingsSocket || this.wingsSocket.readyState !== WebSocket.OPEN) {
-        await this.connectToWings();
+        await this.connectToWings(params.wingsUrl, params.wingsToken);
       }
+
+      // Log the connection
+      this.ctx.storage.sql.exec(
+        "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
+        params.userId, "console.connect", null,
+      );
 
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -39,39 +62,42 @@ export class ConsoleSession extends DurableObject {
     return new Response("Not found", { status: 404 });
   }
 
-  private async connectToWings() {
-    const wingsUrl = await this.ctx.storage.get<string>("wingsUrl");
-    const wingsToken = await this.ctx.storage.get<string>("wingsToken");
-
-    if (!wingsUrl || !wingsToken) {
-      throw new Error("Wings connection not configured");
+  private async connectToWings(wingsUrl: string, wingsToken: string) {
+    if (this.wingsSocket) {
+      try { this.wingsSocket.close(); } catch {}
+      this.wingsSocket = null;
     }
 
     const ws = new WebSocket(wingsUrl);
 
     ws.addEventListener("open", () => {
-      // Send auth token to Wings
-      ws.send(JSON.stringify({
-        event: "auth",
-        args: [wingsToken],
-      }));
+      ws.send(JSON.stringify({ event: "auth", args: [wingsToken] }));
     });
 
     ws.addEventListener("message", (event) => {
-      // Relay Wings messages to all connected clients
-      for (const client of this.clientSockets) {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(typeof event.data === "string" ? event.data : "");
-        }
+      const data = typeof event.data === "string" ? event.data : "";
+
+      // Buffer for reconnect replay
+      this.buffer.push(data);
+      if (this.buffer.length > ConsoleSession.BUFFER_SIZE) {
+        this.buffer = this.buffer.slice(-ConsoleSession.BUFFER_SIZE);
+      }
+
+      // Fan out to all connected browser clients
+      for (const client of this.ctx.getWebSockets()) {
+        try {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(data);
+          }
+        } catch {}
       }
     });
 
     ws.addEventListener("close", () => {
       this.wingsSocket = null;
-      for (const client of this.clientSockets) {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({ event: "daemon error", args: ["Wings connection lost"] }));
-        }
+      const msg = JSON.stringify({ event: "daemon error", args: ["Wings connection lost"] });
+      for (const client of this.ctx.getWebSockets()) {
+        try { client.send(msg); } catch {}
       }
     });
 
@@ -83,22 +109,48 @@ export class ConsoleSession extends DurableObject {
   }
 
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
-    // Relay client messages to Wings
+    const data = typeof message === "string" ? message : new TextDecoder().decode(message);
+
+    // Log commands to audit trail
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.event === "send command" && parsed.args?.[0]) {
+        const tags = this.ctx.getTags(ws);
+        const userId = tags[0] || "unknown";
+        this.ctx.storage.sql.exec(
+          "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
+          userId, "console.command", parsed.args[0],
+        );
+      }
+    } catch {}
+
+    // Relay to Wings
     if (this.wingsSocket?.readyState === WebSocket.OPEN) {
-      const data = typeof message === "string" ? message : new TextDecoder().decode(message);
       this.wingsSocket.send(data);
     }
   }
 
   webSocketClose(ws: WebSocket) {
-    this.clientSockets.delete(ws);
-    if (this.clientSockets.size === 0 && this.wingsSocket) {
+    const tags = this.ctx.getTags(ws);
+    const userId = tags[0] || "unknown";
+    this.ctx.storage.sql.exec(
+      "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
+      userId, "console.disconnect", null,
+    );
+
+    // If no more clients, close Wings connection
+    const remaining = this.ctx.getWebSockets();
+    if (remaining.length === 0 && this.wingsSocket) {
       this.wingsSocket.close();
       this.wingsSocket = null;
     }
   }
 
   webSocketError(ws: WebSocket) {
-    this.clientSockets.delete(ws);
+    const remaining = this.ctx.getWebSockets();
+    if (remaining.length === 0 && this.wingsSocket) {
+      this.wingsSocket.close();
+      this.wingsSocket = null;
+    }
   }
 }
