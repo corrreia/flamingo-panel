@@ -270,7 +270,7 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
     serverId: server.id,
     serverUuid: server.uuid,
     userId: user.id,
-    wingsUrl: `wss://${node.fqdn}/api/servers/${server.uuid}/ws`,
+    wingsUrl: `${node.url.replace(/^http/, "ws").replace(/\/+$/, "")}/api/servers/${server.uuid}/ws`,
     wingsToken,
   }), { expirationTtl: 30 });
 

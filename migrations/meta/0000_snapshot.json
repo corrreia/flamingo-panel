@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9a1a9fb8-82c0-4197-a81a-1dcd03a62c01",
+  "id": "63bec1a8-8024-4f09-aff6-eefc8991cdf8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activity_logs": {
@@ -468,36 +468,13 @@
           "notNull": true,
           "autoincrement": false
         },
-        "fqdn": {
-          "name": "fqdn",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "scheme": {
-          "name": "scheme",
+        "url": {
+          "name": "url",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'https'"
-        },
-        "daemon_port": {
-          "name": "daemon_port",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 8080
-        },
-        "daemon_sftp_port": {
-          "name": "daemon_sftp_port",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 2022
+          "default": "''"
         },
         "token_id": {
           "name": "token_id",
@@ -552,14 +529,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 100
-        },
-        "behind_proxy": {
-          "name": "behind_proxy",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         },
         "created_at": {
           "name": "created_at",

@@ -19,10 +19,7 @@ export const users = sqliteTable("users", {
 export const nodes = sqliteTable("nodes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  fqdn: text("fqdn").notNull(),
-  scheme: text("scheme", { enum: ["http", "https"] }).notNull().default("https"),
-  daemonPort: integer("daemon_port").notNull().default(8080),
-  daemonSftpPort: integer("daemon_sftp_port").notNull().default(2022),
+  url: text("url").notNull().default(""),  // full Wings URL e.g. https://wings.example.com
   tokenId: text("token_id").notNull(),
   token: text("token").notNull(),
   memory: integer("memory").notNull().default(0),
@@ -30,7 +27,6 @@ export const nodes = sqliteTable("nodes", {
   disk: integer("disk").notNull().default(0),
   diskOverallocate: integer("disk_overallocate").notNull().default(0),
   uploadSize: integer("upload_size").notNull().default(100),
-  behindProxy: integer("behind_proxy").notNull().default(0),
   ...timestamps,
 });
 

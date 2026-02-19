@@ -13,12 +13,11 @@ nodeRoutes.use("*", requireAuth);
 
 const createNodeSchema = z.object({
   name: z.string().min(1).max(255),
-  fqdn: z.string().default(""),  // filled in later after cloudflared setup
+  url: z.string().default(""),  // full Wings URL, can be set later
   memory: z.number().int().min(0).default(0),
   memoryOverallocate: z.number().int().default(0),
   disk: z.number().int().min(0).default(0),
   diskOverallocate: z.number().int().default(0),
-  panelUrl: z.string().optional(),  // override for configure command
 });
 
 // List all nodes
@@ -27,7 +26,7 @@ nodeRoutes.get("/", requireAdmin, async (c) => {
   const allNodes = await db.select({
     id: schema.nodes.id,
     name: schema.nodes.name,
-    fqdn: schema.nodes.fqdn,
+    url: schema.nodes.url,
     memory: schema.nodes.memory,
     disk: schema.nodes.disk,
     createdAt: schema.nodes.createdAt,
@@ -43,11 +42,13 @@ nodeRoutes.get("/:id", requireAdmin, async (c) => {
   if (!node) return c.json({ error: "Node not found" }, 404);
 
   let stats = null;
-  try {
-    const client = new WingsClient(node);
-    stats = await client.getSystemInfo();
-  } catch {
-    // Node might be offline
+  if (node.url) {
+    try {
+      const client = new WingsClient(node);
+      stats = await client.getSystemInfo();
+    } catch {
+      // Node might be offline
+    }
   }
 
   return c.json({ ...node, token: undefined, stats });
@@ -65,9 +66,8 @@ nodeRoutes.post("/", requireAdmin, zValidator("json", createNodeSchema), async (
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
     .map(b => b.toString(16).padStart(2, "0")).join("");
 
-  const { panelUrl: _, ...nodeData } = data;
   const node = await db.insert(schema.nodes).values({
-    ...nodeData,
+    ...data,
     tokenId,
     token,
   }).returning().get();
@@ -88,18 +88,16 @@ nodeRoutes.post("/", requireAdmin, zValidator("json", createNodeSchema), async (
     memo: `node-configure:${node.id}`,
   });
 
-  const url = data.panelUrl || c.env.PANEL_URL;
-
   return c.json({
     ...node,
     token: undefined,
-    configureCommand: `wings configure --panel-url ${url} --token ${apiToken} --node ${node.id}`,
+    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id}`,
   }, 201);
 });
 
 const updateNodeSchema = z.object({
   name: z.string().min(1).max(255),
-  fqdn: z.string(),
+  url: z.string(),
   memory: z.number().int().min(0),
   memoryOverallocate: z.number().int(),
   disk: z.number().int().min(0),

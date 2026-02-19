@@ -1,9 +1,9 @@
 // Wings HTTP client for Panel → Wings communication via Cloudflare Tunnel.
-// Each Wings node runs cloudflared, so we reach it via its tunnel hostname
-// over HTTPS (Cloudflare terminates TLS, Wings sees plain HTTP).
+// Each Wings node runs cloudflared, so we reach it via its tunnel hostname.
+// The node URL can be https://wings.example.com, http://10.0.0.5:8080, etc.
 
 interface WingsNode {
-  fqdn: string;       // Tunnel hostname (e.g., wings-node1.example.com)
+  url: string;         // Full Wings URL (e.g., https://wings.example.com)
   tokenId: string;
   token: string;
 }
@@ -13,8 +13,7 @@ export class WingsClient {
   private authHeader: string;
 
   constructor(node: WingsNode) {
-    // Tunnel hostnames are always HTTPS via Cloudflare edge
-    this.baseUrl = `https://${node.fqdn}`;
+    this.baseUrl = node.url.replace(/\/+$/, ""); // strip trailing slash
     this.authHeader = `Bearer ${node.tokenId}.${node.token}`;
   }
 

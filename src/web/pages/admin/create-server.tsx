@@ -12,7 +12,7 @@ import { Skeleton } from "@web/components/ui/skeleton";
 import { ArrowLeft, Server, ChevronRight } from "lucide-react";
 
 interface UserItem { id: string; email: string; username: string; role: string; }
-interface NodeItem { id: number; name: string; fqdn: string; memory: number; disk: number; }
+interface NodeItem { id: number; name: string; url: string; memory: number; disk: number; }
 interface EggItem { id: string; name: string; dockerImage: string; startup: string; }
 interface EggVariable {
   id: string; name: string; description: string | null;
@@ -200,7 +200,7 @@ export function CreateServerPage() {
                   <SelectContent>
                     {nodes.map((n) => (
                       <SelectItem key={n.id} value={String(n.id)}>
-                        {n.name} {n.fqdn ? `(${n.fqdn})` : ""}
+                        {n.name} {n.url ? `(${n.url})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

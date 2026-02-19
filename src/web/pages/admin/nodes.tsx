@@ -22,7 +22,7 @@ import {
 interface NodeItem {
   id: number;
   name: string;
-  fqdn: string;
+  url: string;
   memory: number;
   disk: number;
   createdAt: string;
@@ -54,9 +54,9 @@ export function NodesPage() {
 
   // Create form state
   const [name, setName] = useState("");
+  const [nodeUrl, setNodeUrl] = useState("");
   const [memory, setMemory] = useState("0");
   const [disk, setDisk] = useState("0");
-  const [panelUrl, setPanelUrl] = useState(window.location.origin);
 
   const load = () => {
     setLoading(true);
@@ -72,14 +72,14 @@ export function NodesPage() {
     try {
       const result = await api.post<CreatedNode>("/nodes", {
         name,
+        url: nodeUrl || undefined,
         memory: parseInt(memory) || 0,
         disk: parseInt(disk) || 0,
-        panelUrl,
       });
       setCreatedNode(result);
       setDialogOpen(false);
       setResultDialogOpen(true);
-      setName(""); setMemory("0"); setDisk("0");
+      setName(""); setNodeUrl(""); setMemory("0"); setDisk("0");
       load();
     } catch (err: any) {
       setError(err.message);
@@ -122,7 +122,6 @@ export function NodesPage() {
               <DialogTitle>Add Node</DialogTitle>
               <DialogDescription>
                 Create a node to get the <code>wings configure</code> command.
-                The tunnel hostname can be set after cloudflared is running.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
@@ -136,16 +135,16 @@ export function NodesPage() {
                 <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="US East 1" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="panel-url">Panel URL</Label>
+                <Label htmlFor="node-url">Wings URL (optional — set after cloudflared is running)</Label>
                 <Input
-                  id="panel-url"
-                  value={panelUrl}
-                  onChange={(e) => setPanelUrl(e.target.value)}
-                  placeholder="https://panel.example.com"
-                  required
+                  id="node-url"
+                  value={nodeUrl}
+                  onChange={(e) => setNodeUrl(e.target.value)}
+                  placeholder="https://wings-node1.example.com"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use <code>https://</code> in production. HTTP and custom ports are supported for development.
+                  Full URL including protocol and port. Use <code>https://</code> in production.
+                  HTTP and custom ports (e.g. <code>http://10.0.0.5:8080</code>) are fine for dev.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -194,9 +193,11 @@ export function NodesPage() {
                   : <><Copy className="h-4 w-4 mr-2" /> Copy Command</>
                 }
               </Button>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>After Wings connects, set up cloudflared and paste the tunnel hostname on this node.</p>
-              </div>
+              {!createdNode.url && (
+                <p className="text-xs text-muted-foreground">
+                  After Wings is configured and cloudflared is running, set the Wings URL on this node.
+                </p>
+              )}
             </div>
           )}
         </DialogContent>
@@ -221,10 +222,9 @@ export function NodesPage() {
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Hostname</TableHead>
+                <TableHead>Wings URL</TableHead>
                 <TableHead className="text-right">Memory</TableHead>
                 <TableHead className="text-right">Disk</TableHead>
-                <TableHead className="text-right">Created</TableHead>
                 <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
@@ -243,8 +243,8 @@ export function NodesPage() {
 function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () => void; onUpdate: () => void }) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [checking, setChecking] = useState(false);
-  const [fqdnDialogOpen, setFqdnDialogOpen] = useState(false);
-  const [fqdn, setFqdn] = useState(node.fqdn);
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [url, setUrl] = useState(node.url);
   const [saving, setSaving] = useState(false);
 
   const checkStatus = () => {
@@ -254,12 +254,12 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
       .finally(() => setChecking(false));
   };
 
-  const handleSetFqdn = async (e: React.FormEvent) => {
+  const handleSetUrl = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.put(`/nodes/${node.id}`, { fqdn });
-      setFqdnDialogOpen(false);
+      await api.put(`/nodes/${node.id}`, { url });
+      setUrlDialogOpen(false);
       onUpdate();
     } catch (err: any) {
       alert(err.message);
@@ -287,10 +287,10 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
         </div>
       </TableCell>
       <TableCell>
-        {node.fqdn ? (
+        {node.url ? (
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-muted-foreground">{node.fqdn}</span>
-            <Dialog open={fqdnDialogOpen} onOpenChange={setFqdnDialogOpen}>
+            <span className="font-mono text-sm text-muted-foreground">{node.url}</span>
+            <Dialog open={urlDialogOpen} onOpenChange={setUrlDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-6 px-1">
                   <Globe className="h-3 w-3" />
@@ -298,15 +298,15 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Update Tunnel Hostname</DialogTitle>
+                  <DialogTitle>Update Wings URL</DialogTitle>
                   <DialogDescription>
-                    Change the cloudflared tunnel hostname for node "{node.name}".
+                    Full URL for node "{node.name}" including protocol and port.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSetFqdn} className="space-y-4">
+                <form onSubmit={handleSetUrl} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="fqdn-input">Tunnel Hostname</Label>
-                    <Input id="fqdn-input" value={fqdn} onChange={(e) => setFqdn(e.target.value)} placeholder="wings-node1.example.com" required />
+                    <Label htmlFor="url-input">Wings URL</Label>
+                    <Input id="url-input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://wings-node1.example.com" required />
                   </div>
                   <DialogFooter>
                     <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
@@ -316,23 +316,23 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
             </Dialog>
           </div>
         ) : (
-          <Dialog open={fqdnDialogOpen} onOpenChange={setFqdnDialogOpen}>
+          <Dialog open={urlDialogOpen} onOpenChange={setUrlDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="text-xs">
-                <Globe className="h-3 w-3 mr-1" /> Set Hostname
+                <Globe className="h-3 w-3 mr-1" /> Set URL
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Set Tunnel Hostname</DialogTitle>
+                <DialogTitle>Set Wings URL</DialogTitle>
                 <DialogDescription>
-                  Enter the cloudflared tunnel hostname for node "{node.name}".
+                  Enter the full Wings URL for node "{node.name}". Use <code>https://</code> for production.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleSetFqdn} className="space-y-4">
+              <form onSubmit={handleSetUrl} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fqdn-input">Tunnel Hostname</Label>
-                  <Input id="fqdn-input" value={fqdn} onChange={(e) => setFqdn(e.target.value)} placeholder="wings-node1.example.com" required />
+                  <Label htmlFor="url-input">Wings URL</Label>
+                  <Input id="url-input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://wings-node1.example.com" required />
                 </div>
                 <DialogFooter>
                   <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
@@ -344,12 +344,9 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
       </TableCell>
       <TableCell className="text-right text-muted-foreground">{node.memory > 0 ? `${node.memory} MB` : "-"}</TableCell>
       <TableCell className="text-right text-muted-foreground">{node.disk > 0 ? `${node.disk} MB` : "-"}</TableCell>
-      <TableCell className="text-right text-muted-foreground text-xs">
-        {new Date(node.createdAt).toLocaleDateString()}
-      </TableCell>
       <TableCell>
         <div className="flex gap-1">
-          {node.fqdn && (
+          {node.url && (
             <Button variant="ghost" size="sm" onClick={checkStatus} disabled={checking}>
               {checking ? "..." : "Check"}
             </Button>
