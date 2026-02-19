@@ -148,3 +148,54 @@ serverRoutes.get("/:id/websocket", async (c) => {
     socket: `wss://${node.fqdn}/api/servers/${server.uuid}/ws`,
   });
 });
+
+// WebSocket console proxy via Durable Object
+serverRoutes.get("/:id/console", async (c) => {
+  const user = c.get("user");
+  const db = getDb(c.env.DB);
+
+  const server = await db.select().from(schema.servers)
+    .where(eq(schema.servers.id, c.req.param("id"))).get();
+  if (!server) return c.json({ error: "Server not found" }, 404);
+  if (user.role !== "admin" && server.ownerId !== user.id) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+
+  const node = await db.select().from(schema.nodes)
+    .where(eq(schema.nodes.id, server.nodeId)).get();
+  if (!node) return c.json({ error: "Node not found" }, 404);
+
+  const permissions = [
+    WS_PERMISSIONS.CONNECT,
+    WS_PERMISSIONS.SEND_COMMAND,
+    WS_PERMISSIONS.POWER_START,
+    WS_PERMISSIONS.POWER_STOP,
+    WS_PERMISSIONS.POWER_RESTART,
+    WS_PERMISSIONS.BACKUP_READ,
+  ];
+  if (user.role === "admin") {
+    permissions.push(WS_PERMISSIONS.ADMIN_ERRORS, WS_PERMISSIONS.ADMIN_INSTALL);
+  }
+
+  const wingsToken = await signWingsWebsocketToken(
+    { user_uuid: user.id, server_uuid: server.uuid, permissions },
+    node.token,
+  );
+
+  const wingsUrl = `wss://${node.fqdn}/api/servers/${server.uuid}/ws`;
+
+  // Get or create Durable Object for this server
+  const doId = c.env.CONSOLE_SESSION.idFromName(server.uuid);
+  const stub = c.env.CONSOLE_SESSION.get(doId);
+
+  // Configure the DO with Wings connection info
+  await stub.fetch(new Request("https://internal/connect", {
+    method: "POST",
+    body: JSON.stringify({ wingsUrl, wingsToken }),
+  }));
+
+  // Proxy the WebSocket upgrade to the DO
+  return stub.fetch(new Request("https://internal/websocket", {
+    headers: c.req.raw.headers,
+  }));
+});
