@@ -16,7 +16,7 @@ import {
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   Network, Plus, Trash2, ArrowLeft, Wifi, WifiOff,
-  Key, Copy, Globe, Check,
+  Copy, Globe, Check,
 } from "lucide-react";
 
 interface NodeItem {
@@ -47,20 +47,15 @@ export function NodesPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
-  const [apiTokenDialogOpen, setApiTokenDialogOpen] = useState(false);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [createdNode, setCreatedNode] = useState<CreatedNode | null>(null);
+  const [commandCopied, setCommandCopied] = useState(false);
 
   // Create form state
   const [name, setName] = useState("");
   const [memory, setMemory] = useState("0");
   const [disk, setDisk] = useState("0");
-
-  // API token state
-  const [apiToken, setApiToken] = useState("");
-  const [generatingToken, setGeneratingToken] = useState(false);
-  const [tokenCopied, setTokenCopied] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -101,27 +96,10 @@ export function NodesPage() {
     }
   };
 
-  const handleGenerateApiToken = async () => {
-    setGeneratingToken(true);
-    try {
-      const result = await api.post<{ token: string; identifier: string }>("/auth/api-keys", {
-        memo: "Wings configure token",
-      });
-      setApiToken(result.token);
-      setTokenCopied(false);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setGeneratingToken(false);
-    }
-  };
-
-  const copyToClipboard = (text: string, setCopied?: (v: boolean) => void) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    if (setCopied) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    setCommandCopied(true);
+    setTimeout(() => setCommandCopied(false), 2000);
   };
 
   return (
@@ -133,110 +111,77 @@ export function NodesPage() {
           </Button>
           <h1 className="text-2xl font-bold">Nodes</h1>
         </div>
-        <div className="flex gap-2">
-          {/* Generate API Token */}
-          <Dialog open={apiTokenDialogOpen} onOpenChange={(open) => {
-            setApiTokenDialogOpen(open);
-            if (!open) setApiToken("");
-          }}>
-            <DialogTrigger asChild>
-              <Button variant="outline"><Key className="h-4 w-4 mr-2" /> API Token</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Application API Token</DialogTitle>
-                <DialogDescription>
-                  Generate a token for <code>wings configure --token</code>. This token is only shown once.
-                </DialogDescription>
-              </DialogHeader>
-              {apiToken ? (
-                <div className="space-y-3">
-                  <Alert>
-                    <AlertDescription className="font-mono text-xs break-all select-all">
-                      {apiToken}
-                    </AlertDescription>
-                  </Alert>
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => copyToClipboard(apiToken, setTokenCopied)}>
-                    {tokenCopied ? <><Check className="h-4 w-4 mr-2" /> Copied</> : <><Copy className="h-4 w-4 mr-2" /> Copy Token</>}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Save this token now. It cannot be retrieved later.
-                  </p>
-                </div>
-              ) : (
-                <DialogFooter>
-                  <Button onClick={handleGenerateApiToken} disabled={generatingToken}>
-                    {generatingToken ? "Generating..." : "Generate Token"}
-                  </Button>
-                </DialogFooter>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button><Plus className="h-4 w-4 mr-2" /> Add Node</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Node</DialogTitle>
+              <DialogDescription>
+                Create a node to get the <code>wings configure</code> command.
+                The tunnel hostname can be set after cloudflared is running.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreate} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Add Node */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Add Node</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Node</DialogTitle>
-                <DialogDescription>
-                  Create a node and get the <code>wings configure</code> command.
-                  The tunnel hostname can be set later after cloudflared is running.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="node-name">Name</Label>
+                <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="US East 1" required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="node-name">Name</Label>
-                  <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="US East 1" required />
+                  <Label htmlFor="node-memory">Memory (MB)</Label>
+                  <Input id="node-memory" type="number" value={memory} onChange={(e) => setMemory(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="node-memory">Memory (MB)</Label>
-                    <Input id="node-memory" type="number" value={memory} onChange={(e) => setMemory(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="node-disk">Disk (MB)</Label>
-                    <Input id="node-disk" type="number" value={disk} onChange={(e) => setDisk(e.target.value)} />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="node-disk">Disk (MB)</Label>
+                  <Input id="node-disk" type="number" value={disk} onChange={(e) => setDisk(e.target.value)} />
                 </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={creating}>
-                    {creating ? "Creating..." : "Create Node"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={creating}>
+                  {creating ? "Creating..." : "Create Node"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Result dialog after node creation */}
+      {/* Result dialog after node creation — shows wings configure command */}
       <Dialog open={resultDialogOpen} onOpenChange={setResultDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Node Created</DialogTitle>
             <DialogDescription>
-              Run this on your Wings machine to auto-configure it. Replace <code>&lt;APP_API_TOKEN&gt;</code> with your API token.
+              Run this command on your Wings machine. The API token is one-time use
+              and will be consumed when Wings configures.
             </DialogDescription>
           </DialogHeader>
           {createdNode && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="rounded-md bg-muted p-3 font-mono text-xs break-all select-all">
                 {createdNode.configureCommand}
               </div>
-              <Button variant="outline" size="sm" className="w-full" onClick={() => copyToClipboard(createdNode.configureCommand)}>
-                <Copy className="h-4 w-4 mr-2" /> Copy Command
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => copyToClipboard(createdNode.configureCommand)}
+              >
+                {commandCopied
+                  ? <><Check className="h-4 w-4 mr-2" /> Copied</>
+                  : <><Copy className="h-4 w-4 mr-2" /> Copy Command</>
+                }
               </Button>
-              <p className="text-xs text-muted-foreground">
-                After Wings connects, set up cloudflared and paste the tunnel hostname on this node.
-              </p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>After Wings connects, set up cloudflared and paste the tunnel hostname on this node.</p>
+              </div>
             </div>
           )}
         </DialogContent>
@@ -326,7 +271,33 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
       </TableCell>
       <TableCell>
         {node.fqdn ? (
-          <span className="font-mono text-sm text-muted-foreground">{node.fqdn}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm text-muted-foreground">{node.fqdn}</span>
+            <Dialog open={fqdnDialogOpen} onOpenChange={setFqdnDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-1">
+                  <Globe className="h-3 w-3" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Update Tunnel Hostname</DialogTitle>
+                  <DialogDescription>
+                    Change the cloudflared tunnel hostname for node "{node.name}".
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSetFqdn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fqdn-input">Tunnel Hostname</Label>
+                    <Input id="fqdn-input" value={fqdn} onChange={(e) => setFqdn(e.target.value)} placeholder="wings-node1.example.com" required />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         ) : (
           <Dialog open={fqdnDialogOpen} onOpenChange={setFqdnDialogOpen}>
             <DialogTrigger asChild>
@@ -347,9 +318,7 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
                   <Input id="fqdn-input" value={fqdn} onChange={(e) => setFqdn(e.target.value)} placeholder="wings-node1.example.com" required />
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? "Saving..." : "Save"}
-                  </Button>
+                  <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
