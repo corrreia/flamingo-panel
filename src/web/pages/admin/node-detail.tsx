@@ -237,45 +237,6 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
           </CardContent>
         </Card>
 
-        {/* Reconfigure */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Terminal className="h-4 w-4" /> Reconfigure Wings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Generate a new one-time <code>wings configure</code> command. Use this if you rebuilt the Wings machine or need to re-sync the configuration.
-            </p>
-            {configureCommand ? (
-              <div className="space-y-3">
-                <div className="rounded-md bg-muted p-3 font-mono text-xs break-all select-all">
-                  {configureCommand}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(configureCommand)}
-                >
-                  {commandCopied
-                    ? <><Check className="h-4 w-4 mr-2" /> Copied</>
-                    : <><Copy className="h-4 w-4 mr-2" /> Copy Command</>
-                  }
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  This token is one-time use and will be consumed when Wings configures. Remember to restart Wings after running the command.
-                </p>
-              </div>
-            ) : (
-              <Button variant="outline" onClick={handleReconfigure} disabled={regenerating}>
-                <Terminal className="h-4 w-4 mr-2" />
-                {regenerating ? "Generating..." : "Generate Configure Command"}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Edit Node */}
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -308,7 +269,31 @@ export function NodeDetailPage({ nodeId }: { nodeId: string }) {
                 <Input id="edit-disk" type="number" value={disk} onChange={(e) => setDisk(e.target.value)} />
               </div>
             </div>
-            <div className="flex justify-end">
+            {configureCommand && (
+              <div className="space-y-2">
+                <div className="rounded-md bg-muted p-3 font-mono text-xs break-all select-all">
+                  {configureCommand}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(configureCommand)}
+                  >
+                    {commandCopied
+                      ? <><Check className="h-4 w-4 mr-2" /> Copied</>
+                      : <><Copy className="h-4 w-4 mr-2" /> Copy Command</>
+                    }
+                  </Button>
+                  <span className="text-xs text-muted-foreground">One-time use. Restart Wings after running.</span>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={handleReconfigure} disabled={regenerating}>
+                <Terminal className="h-4 w-4 mr-2" />
+                {regenerating ? "Generating..." : "Reconfigure Wings"}
+              </Button>
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? "Saving..." : "Save Changes"}
