@@ -61,7 +61,7 @@ CREATE TABLE `eggs` (
 );
 --> statement-breakpoint
 CREATE TABLE `nodes` (
-	`id` text PRIMARY KEY NOT NULL,
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
 	`fqdn` text NOT NULL,
 	`scheme` text DEFAULT 'https' NOT NULL,
@@ -95,7 +95,7 @@ CREATE TABLE `servers` (
 	`uuid` text NOT NULL,
 	`name` text NOT NULL,
 	`description` text DEFAULT '',
-	`node_id` text NOT NULL,
+	`node_id` integer NOT NULL,
 	`owner_id` text NOT NULL,
 	`egg_id` text,
 	`memory` integer DEFAULT 512 NOT NULL,

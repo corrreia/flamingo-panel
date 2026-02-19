@@ -12,7 +12,7 @@ import { Skeleton } from "@web/components/ui/skeleton";
 import { ArrowLeft, Server, ChevronRight } from "lucide-react";
 
 interface UserItem { id: string; email: string; username: string; role: string; }
-interface NodeItem { id: string; name: string; fqdn: string; memory: number; disk: number; }
+interface NodeItem { id: number; name: string; fqdn: string; memory: number; disk: number; }
 interface EggItem { id: string; name: string; dockerImage: string; startup: string; }
 interface EggVariable {
   id: string; name: string; description: string | null;
@@ -76,7 +76,7 @@ export function CreateServerPage() {
         name,
         description: description || undefined,
         ownerId,
-        nodeId,
+        nodeId: parseInt(nodeId),
         eggId,
         memory: parseInt(memory),
         cpu: parseInt(cpu),
@@ -199,8 +199,8 @@ export function CreateServerPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {nodes.map((n) => (
-                      <SelectItem key={n.id} value={n.id}>
-                        {n.name} ({n.fqdn})
+                      <SelectItem key={n.id} value={String(n.id)}>
+                        {n.name} {n.fqdn ? `(${n.fqdn})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -324,7 +324,7 @@ export function CreateServerPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">Node:</span>
-                <span className="ml-2 font-medium">{nodes.find(n => n.id === nodeId)?.name || "-"}</span>
+                <span className="ml-2 font-medium">{nodes.find(n => String(n.id) === nodeId)?.name || "-"}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Egg:</span>

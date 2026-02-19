@@ -7,7 +7,7 @@
     "not_found_handling": "single-page-application"
   },
   "vars": {
-    "PANEL_URL": "https://your-flamingo.example.com"
+    "PANEL_URL": "http://10.100.0.39:8787"
   },
   "d1_databases": [
     {

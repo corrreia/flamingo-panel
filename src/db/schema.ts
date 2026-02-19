@@ -17,7 +17,7 @@ export const users = sqliteTable("users", {
 });
 
 export const nodes = sqliteTable("nodes", {
-  id: id(),
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   fqdn: text("fqdn").notNull(),
   scheme: text("scheme", { enum: ["http", "https"] }).notNull().default("https"),
@@ -58,7 +58,7 @@ export const servers = sqliteTable("servers", {
   uuid: text("uuid").notNull().unique().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description").default(""),
-  nodeId: text("node_id").notNull().references(() => nodes.id),
+  nodeId: integer("node_id").notNull().references(() => nodes.id),
   ownerId: text("owner_id").notNull().references(() => users.id),
   eggId: text("egg_id").references(() => eggs.id),
   memory: integer("memory").notNull().default(512),

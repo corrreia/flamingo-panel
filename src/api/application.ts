@@ -48,7 +48,7 @@ applicationRoutes.use("*", async (c, next) => {
 applicationRoutes.get("/nodes/:id/configuration", async (c) => {
   const db = getDb(c.env.DB);
   const node = await db.select().from(schema.nodes)
-    .where(eq(schema.nodes.id, c.req.param("id"))).get();
+    .where(eq(schema.nodes.id, Number(c.req.param("id")))).get();
   if (!node) return c.json({ error: "Node not found" }, 404);
 
   // If this was a one-time configure key, consume it (delete after use)

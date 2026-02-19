@@ -16,7 +16,7 @@ serverRoutes.use("*", requireAuth);
 serverRoutes.post("/", zValidator("json", z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  nodeId: z.string().min(1),
+  nodeId: z.number().int(),
   ownerId: z.string().min(1),
   eggId: z.string().min(1),
   memory: z.number().int().min(64).default(512),

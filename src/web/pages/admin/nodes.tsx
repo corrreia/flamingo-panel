@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 interface NodeItem {
-  id: string;
+  id: number;
   name: string;
   fqdn: string;
   memory: number;
@@ -56,6 +56,7 @@ export function NodesPage() {
   const [name, setName] = useState("");
   const [memory, setMemory] = useState("0");
   const [disk, setDisk] = useState("0");
+  const [panelUrl, setPanelUrl] = useState(window.location.origin);
 
   const load = () => {
     setLoading(true);
@@ -73,6 +74,7 @@ export function NodesPage() {
         name,
         memory: parseInt(memory) || 0,
         disk: parseInt(disk) || 0,
+        panelUrl,
       });
       setCreatedNode(result);
       setDialogOpen(false);
@@ -86,7 +88,7 @@ export function NodesPage() {
     }
   };
 
-  const handleDelete = async (id: string, nodeName: string) => {
+  const handleDelete = async (id: number, nodeName: string) => {
     if (!confirm(`Delete node "${nodeName}"? This cannot be undone.`)) return;
     try {
       await api.delete(`/nodes/${id}`);
@@ -132,6 +134,19 @@ export function NodesPage() {
               <div className="space-y-2">
                 <Label htmlFor="node-name">Name</Label>
                 <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="US East 1" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="panel-url">Panel URL</Label>
+                <Input
+                  id="panel-url"
+                  value={panelUrl}
+                  onChange={(e) => setPanelUrl(e.target.value)}
+                  placeholder="https://panel.example.com"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use <code>https://</code> in production. HTTP and custom ports are supported for development.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -204,6 +219,7 @@ export function NodesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">#</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Hostname</TableHead>
                 <TableHead className="text-right">Memory</TableHead>
@@ -254,6 +270,7 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
 
   return (
     <TableRow>
+      <TableCell className="font-mono text-muted-foreground">{node.id}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Network className="h-4 w-4 text-primary" />

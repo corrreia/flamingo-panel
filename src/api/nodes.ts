@@ -18,6 +18,7 @@ const createNodeSchema = z.object({
   memoryOverallocate: z.number().int().default(0),
   disk: z.number().int().min(0).default(0),
   diskOverallocate: z.number().int().default(0),
+  panelUrl: z.string().optional(),  // override for configure command
 });
 
 // List all nodes
@@ -37,7 +38,8 @@ nodeRoutes.get("/", requireAdmin, async (c) => {
 // Get single node with live stats from Wings
 nodeRoutes.get("/:id", requireAdmin, async (c) => {
   const db = getDb(c.env.DB);
-  const node = await db.select().from(schema.nodes).where(eq(schema.nodes.id, c.req.param("id"))).get();
+  const node = await db.select().from(schema.nodes)
+    .where(eq(schema.nodes.id, Number(c.req.param("id")))).get();
   if (!node) return c.json({ error: "Node not found" }, 404);
 
   let stats = null;
@@ -63,8 +65,9 @@ nodeRoutes.post("/", requireAdmin, zValidator("json", createNodeSchema), async (
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
     .map(b => b.toString(16).padStart(2, "0")).join("");
 
+  const { panelUrl: _, ...nodeData } = data;
   const node = await db.insert(schema.nodes).values({
-    ...data,
+    ...nodeData,
     tokenId,
     token,
   }).returning().get();
@@ -85,10 +88,12 @@ nodeRoutes.post("/", requireAdmin, zValidator("json", createNodeSchema), async (
     memo: `node-configure:${node.id}`,
   });
 
+  const url = data.panelUrl || c.env.PANEL_URL;
+
   return c.json({
     ...node,
     token: undefined,
-    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id}`,
+    configureCommand: `wings configure --panel-url ${url} --token ${apiToken} --node ${node.id}`,
   }, 201);
 });
 
@@ -107,7 +112,7 @@ nodeRoutes.put("/:id", requireAdmin, zValidator("json", updateNodeSchema), async
   const data = c.req.valid("json");
   const node = await db.update(schema.nodes)
     .set({ ...data, updatedAt: new Date().toISOString() })
-    .where(eq(schema.nodes.id, c.req.param("id")))
+    .where(eq(schema.nodes.id, Number(c.req.param("id"))))
     .returning().get();
 
   if (!node) return c.json({ error: "Node not found" }, 404);
@@ -117,11 +122,12 @@ nodeRoutes.put("/:id", requireAdmin, zValidator("json", updateNodeSchema), async
 // Delete node
 nodeRoutes.delete("/:id", requireAdmin, async (c) => {
   const db = getDb(c.env.DB);
+  const nodeId = Number(c.req.param("id"));
   const servers = await db.select().from(schema.servers)
-    .where(eq(schema.servers.nodeId, c.req.param("id"))).all();
+    .where(eq(schema.servers.nodeId, nodeId)).all();
   if (servers.length > 0) {
     return c.json({ error: "Cannot delete node with active servers" }, 409);
   }
-  await db.delete(schema.nodes).where(eq(schema.nodes.id, c.req.param("id")));
+  await db.delete(schema.nodes).where(eq(schema.nodes.id, nodeId));
   return c.body(null, 204);
 });
