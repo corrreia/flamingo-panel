@@ -25,4 +25,4 @@ class_name = "ConsoleSession"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["ConsoleSession"]
+new_sqlite_classes = ["ConsoleSession"]
