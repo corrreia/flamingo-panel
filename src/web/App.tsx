@@ -4,6 +4,7 @@ import { LoginPage } from "@web/pages/login";
 import { Dashboard } from "@web/pages/dashboard";
 import { ServerPage } from "@web/pages/server";
 import { NodesPage } from "@web/pages/admin/nodes";
+import { NodeDetailPage } from "@web/pages/admin/node-detail";
 import { EggsPage } from "@web/pages/admin/eggs";
 import { CreateServerPage } from "@web/pages/admin/create-server";
 
@@ -30,6 +31,15 @@ function Router() {
     return (
       <Layout>
         <ServerPage serverId={id} />
+      </Layout>
+    );
+  }
+
+  if (path.startsWith("/admin/nodes/")) {
+    const nodeId = path.split("/admin/nodes/")[1]?.split("/")[0] || "";
+    return (
+      <Layout>
+        <NodeDetailPage nodeId={nodeId} />
       </Layout>
     );
   }

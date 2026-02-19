@@ -14,7 +14,8 @@ export class WingsClient {
 
   constructor(node: WingsNode) {
     this.baseUrl = node.url.replace(/\/+$/, ""); // strip trailing slash
-    this.authHeader = `Bearer ${node.tokenId}.${node.token}`;
+    // Panel→Wings uses just the raw token; tokenId.token is only for Wings→Panel
+    this.authHeader = `Bearer ${node.token}`;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -172,13 +173,24 @@ export class WingsError extends Error {
   }
 }
 
-// Types matching Wings API responses
+// Types matching Wings API responses (/api/system?v=2)
 export interface SystemInfo {
-  architecture: string;
-  cpu_count: number;
-  kernel_version: string;
-  os: string;
   version: string;
+  system: {
+    architecture: string;
+    cpu_threads: number;
+    memory_bytes: number;
+    kernel_version: string;
+    os: string;
+    os_type: string;
+  };
+  docker: {
+    version: string;
+    cgroups: { driver: string; version: string };
+    containers: { total: number; running: number; paused: number; stopped: number };
+    storage: { driver: string; filesystem: string };
+    runc: { version: string };
+  };
 }
 
 export interface SystemUtilization {

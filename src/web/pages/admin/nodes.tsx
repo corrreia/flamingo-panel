@@ -270,11 +270,13 @@ function NodeRow({ node, onDelete, onUpdate }: { node: NodeItem; onDelete: () =>
 
   return (
     <TableRow>
-      <TableCell className="font-mono text-muted-foreground">{node.id}</TableCell>
+      <TableCell className="font-mono text-muted-foreground">
+        <a href={`/admin/nodes/${node.id}`}>{node.id}</a>
+      </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Network className="h-4 w-4 text-primary" />
-          <span className="font-medium">{node.name}</span>
+          <a href={`/admin/nodes/${node.id}`} className="font-medium hover:underline">{node.name}</a>
           {detail && (
             <Badge variant={detail.stats ? "default" : "secondary"} className="ml-1">
               {detail.stats ? (
