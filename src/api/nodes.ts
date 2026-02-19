@@ -51,11 +51,14 @@ nodeRoutes.get("/:id", requireAdmin, async (c) => {
   return c.json({ ...node, token: undefined, stats });
 });
 
-// Create node — auto-generates tokenId + token for Wings auth
+// Create node — auto-generates tokenId + token for Wings auth,
+// plus a one-time API key so the response includes the full wings configure command
 nodeRoutes.post("/", requireAdmin, zValidator("json", createNodeSchema), async (c) => {
   const data = c.req.valid("json");
   const db = getDb(c.env.DB);
+  const user = c.get("user" as never) as { id: string };
 
+  // Generate Wings node credentials
   const tokenId = `node_${crypto.randomUUID().replace(/-/g, "")}`;
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
     .map(b => b.toString(16).padStart(2, "0")).join("");
@@ -66,9 +69,26 @@ nodeRoutes.post("/", requireAdmin, zValidator("json", createNodeSchema), async (
     token,
   }).returning().get();
 
+  // Auto-generate a one-time application API key for wings configure
+  const rawBytes = crypto.getRandomValues(new Uint8Array(32));
+  const rawToken = Array.from(rawBytes).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 43);
+  const apiToken = `papp_${rawToken}`;
+
+  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(apiToken));
+  const tokenHash = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+
+  await db.insert(schema.apiKeys).values({
+    userId: user.id,
+    identifier: `flam_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`,
+    tokenHash,
+    memo: `node-configure:${node.id}`,
+  });
+
   return c.json({
     ...node,
-    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token <APP_API_TOKEN> --node ${node.id}`,
+    token: undefined,
+    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id}`,
   }, 201);
 });
 

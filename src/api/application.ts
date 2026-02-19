@@ -36,6 +36,10 @@ applicationRoutes.use("*", async (c, next) => {
     .set({ lastUsedAt: new Date().toISOString() })
     .where(eq(schema.apiKeys.id, key.id));
 
+  // Pass key info for downstream handlers (e.g. one-time key cleanup)
+  c.set("apiKeyId" as never, key.id);
+  c.set("apiKeyMemo" as never, key.memo || "");
+
   await next();
 });
 
@@ -46,6 +50,13 @@ applicationRoutes.get("/nodes/:id/configuration", async (c) => {
   const node = await db.select().from(schema.nodes)
     .where(eq(schema.nodes.id, c.req.param("id"))).get();
   if (!node) return c.json({ error: "Node not found" }, 404);
+
+  // If this was a one-time configure key, consume it (delete after use)
+  const memo = c.get("apiKeyMemo" as never) as string;
+  if (memo?.startsWith("node-configure:")) {
+    const keyId = c.get("apiKeyId" as never) as string;
+    await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, keyId));
+  }
 
   // Return Wings-compatible configuration JSON
   return c.json({
