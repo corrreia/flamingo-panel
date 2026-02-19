@@ -7,7 +7,7 @@
     "not_found_handling": "single-page-application"
   },
   "vars": {
-    "PANEL_URL": "http://10.100.0.39:8787"
+    "PANEL_URL": "https://employ-chapel-appliance-blend.trycloudflare.com"
   },
   "d1_databases": [
     {
