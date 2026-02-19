@@ -7,6 +7,7 @@ import { serverRoutes } from "./servers";
 import { fileRoutes } from "./files";
 import { eggRoutes } from "./eggs";
 import { remoteRoutes } from "./remote";
+import { applicationRoutes } from "./application";
 import { requireAuth, requireAdmin } from "./middleware/auth";
 import { getDb, schema } from "../db";
 
@@ -20,6 +21,7 @@ apiRoutes.route("/servers", serverRoutes);
 apiRoutes.route("/servers", fileRoutes);  // mounts /:serverId/files/*
 apiRoutes.route("/eggs", eggRoutes);
 apiRoutes.route("/remote", remoteRoutes);
+apiRoutes.route("/application", applicationRoutes);
 
 // Admin: list users (for server creation wizard)
 apiRoutes.get("/users", requireAuth, requireAdmin, async (c) => {
