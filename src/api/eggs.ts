@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
 import { type NormalizedEgg, normalizeEgg } from "../lib/egg-import";
+import { logActivity } from "../lib/activity";
 import { requireAdmin, requireAuth } from "./middleware/auth";
 
 export const eggRoutes = new Hono<{ Bindings: Env }>();
@@ -120,6 +121,7 @@ eggRoutes.post(
       .from(schema.eggVariables)
       .where(eq(schema.eggVariables.eggId, egg.id))
       .all();
+    logActivity(c, { event: "egg:create", metadata: { name: data.name } });
     return c.json({ ...egg, variables }, 201);
   }
 );
@@ -228,6 +230,7 @@ eggRoutes.put(
       .from(schema.eggVariables)
       .where(eq(schema.eggVariables.eggId, eggId))
       .all();
+    logActivity(c, { event: "egg:update", metadata: { name: egg?.name } });
     return c.json({ ...egg, variables });
   }
 );
@@ -290,6 +293,7 @@ eggRoutes.post("/import", requireAdmin, async (c) => {
     .from(schema.eggVariables)
     .where(eq(schema.eggVariables.eggId, egg.id))
     .all();
+  logActivity(c, { event: "egg:import", metadata: { name: normalized.name } });
   return c.json({ ...egg, variables }, 201);
 });
 
@@ -381,6 +385,7 @@ eggRoutes.delete("/:id", async (c) => {
     return c.json({ error: "Cannot delete egg with active servers" }, 409);
   }
 
+  logActivity(c, { event: "egg:delete", metadata: { name: egg.name } });
   await db.delete(schema.eggs).where(eq(schema.eggs.id, egg.id));
   return c.body(null, 204);
 });
