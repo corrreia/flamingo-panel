@@ -181,10 +181,10 @@ function NodeDetailPage() {
             </div>
             <Badge
               variant={
-                metrics.connected || node.stats ? "default" : "secondary"
+                metrics.wingsOnline || node.stats ? "default" : "secondary"
               }
             >
-              {metrics.connected || node.stats ? (
+              {metrics.wingsOnline || node.stats ? (
                 <>
                   <Wifi className="mr-1 h-3 w-3" /> Online
                 </>

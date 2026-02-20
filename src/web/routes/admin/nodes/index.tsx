@@ -107,7 +107,7 @@ function NodeRow({
       <TableCell>
         <div className="flex items-center gap-2">
           <span
-            className={`inline-block h-2 w-2 rounded-full ${metrics.connected ? "bg-green-500" : "bg-gray-400"}`}
+            className={`inline-block h-2 w-2 rounded-full ${metrics.wingsOnline ? "bg-green-500" : "bg-gray-400"}`}
           />
           <Link
             className="font-medium hover:underline"

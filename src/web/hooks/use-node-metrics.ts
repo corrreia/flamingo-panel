@@ -7,6 +7,7 @@ interface NodeMetricsState {
   error: string | null;
   systemInfo: SystemInfo | null;
   utilization: SystemUtilization | null;
+  wingsOnline: boolean;
 }
 
 const DEFAULT_STATE: NodeMetricsState = {
@@ -14,6 +15,7 @@ const DEFAULT_STATE: NodeMetricsState = {
   utilization: null,
   connected: false,
   error: null,
+  wingsOnline: false,
 };
 
 export function useNodeMetrics(
@@ -56,16 +58,21 @@ export function useNodeMetrics(
               setState((prev) => ({
                 ...prev,
                 systemInfo: msg.data as SystemInfo,
+                wingsOnline: true,
+                error: null,
               }));
             } else if (msg.event === "utilization") {
               setState((prev) => ({
                 ...prev,
                 utilization: msg.data as SystemUtilization,
+                wingsOnline: true,
+                error: null,
               }));
             } else if (msg.event === "error") {
               setState((prev) => ({
                 ...prev,
                 error: msg.data as string,
+                wingsOnline: false,
               }));
             }
           } catch {
@@ -74,7 +81,7 @@ export function useNodeMetrics(
         };
 
         ws.onclose = () => {
-          setState((prev) => ({ ...prev, connected: false }));
+          setState((prev) => ({ ...prev, connected: false, wingsOnline: false }));
         };
       })
       .catch(() => {
