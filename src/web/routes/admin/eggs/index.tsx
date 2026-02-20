@@ -235,7 +235,7 @@ function EggsPage() {
             </Button>
             <h1 className="font-bold text-2xl">Eggs</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Dialog onOpenChange={setImportOpen} open={importOpen}>
               <DialogTrigger asChild>
                 <Button variant="secondary">
@@ -340,9 +340,9 @@ function EggRow({ egg }: { egg: EggItem }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <button
-            className="flex items-center gap-3 border-none bg-transparent p-0"
+            className="flex flex-wrap items-center gap-2 border-none bg-transparent p-0 text-left sm:gap-3"
             onClick={() => setExpanded(!expanded)}
             type="button"
           >

@@ -201,7 +201,7 @@ function CreateServerPage() {
           <h1 className="font-bold text-2xl">Create Server</h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {steps.map((s, i) => (
             <div className="flex items-center gap-2" key={s.label}>
               {i > 0 && (
@@ -372,7 +372,7 @@ function CreateServerPage() {
               <CardTitle className="text-base">Resource Limits</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="srv-memory">Memory (MB)</Label>
                   <Input
@@ -478,7 +478,7 @@ function CreateServerPage() {
               <CardTitle className="text-base">Review & Create</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 sm:gap-4">
                 <div>
                   <span className="text-muted-foreground">Name:</span>
                   <span className="ml-2 font-medium">{name}</span>
@@ -536,7 +536,7 @@ function CreateServerPage() {
                   <div className="space-y-1">
                     {eggDetail.variables.map((v) => (
                       <div className="flex font-mono text-xs" key={v.id}>
-                        <span className="w-48 text-muted-foreground">
+                        <span className="w-32 shrink-0 text-muted-foreground sm:w-48">
                           {v.envVariable}:
                         </span>
                         <span>

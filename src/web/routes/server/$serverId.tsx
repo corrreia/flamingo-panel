@@ -128,7 +128,7 @@ function ServerPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Button asChild size="sm" variant="ghost">
               <Link to="/">
@@ -151,7 +151,7 @@ function ServerPage() {
         </div>
 
         {server.resources?.utilization && (
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
             <StatCard
               icon={<Cpu className="h-4 w-4" />}
               label="CPU"
@@ -176,20 +176,22 @@ function ServerPage() {
         )}
 
         <Tabs defaultValue="console">
-          <TabsList>
-            <TabsTrigger value="console">
-              <Terminal className="mr-2 h-4 w-4" /> Console
-            </TabsTrigger>
-            <TabsTrigger value="files">
-              <FolderOpen className="mr-2 h-4 w-4" /> Files
-            </TabsTrigger>
-            <TabsTrigger value="settings">
-              <Settings className="mr-2 h-4 w-4" /> Settings
-            </TabsTrigger>
-            <TabsTrigger value="activity">
-              <ClipboardList className="mr-2 h-4 w-4" /> Activity
-            </TabsTrigger>
-          </TabsList>
+          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+            <TabsList>
+              <TabsTrigger value="console">
+                <Terminal className="mr-2 h-4 w-4" /> Console
+              </TabsTrigger>
+              <TabsTrigger value="files">
+                <FolderOpen className="mr-2 h-4 w-4" /> Files
+              </TabsTrigger>
+              <TabsTrigger value="settings">
+                <Settings className="mr-2 h-4 w-4" /> Settings
+              </TabsTrigger>
+              <TabsTrigger value="activity">
+                <ClipboardList className="mr-2 h-4 w-4" /> Activity
+              </TabsTrigger>
+            </TabsList>
+          </div>
           <TabsContent value="console">
             <ConsoleTab serverId={server.id} />
           </TabsContent>
@@ -221,14 +223,14 @@ function PowerControls({
   });
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button
         disabled={powerMutation.isPending || state === "running"}
         onClick={() => powerMutation.mutate("start")}
         size="sm"
         variant="default"
       >
-        <Play className="mr-1 h-4 w-4" /> Start
+        <Play className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Start</span>
       </Button>
       <Button
         disabled={powerMutation.isPending || state === "offline"}
@@ -236,7 +238,7 @@ function PowerControls({
         size="sm"
         variant="secondary"
       >
-        <RotateCcw className="mr-1 h-4 w-4" /> Restart
+        <RotateCcw className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Restart</span>
       </Button>
       <Button
         disabled={powerMutation.isPending || state === "offline"}
@@ -244,7 +246,7 @@ function PowerControls({
         size="sm"
         variant="secondary"
       >
-        <Square className="mr-1 h-4 w-4" /> Stop
+        <Square className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Stop</span>
       </Button>
       <Button
         disabled={powerMutation.isPending || state === "offline"}
@@ -252,7 +254,7 @@ function PowerControls({
         size="sm"
         variant="destructive"
       >
-        <Skull className="mr-1 h-4 w-4" /> Kill
+        <Skull className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Kill</span>
       </Button>
     </div>
   );
@@ -525,8 +527,8 @@ function FilesTab({ serverId }: { serverId: string }) {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
               <Button onClick={closeEditor} size="sm" variant="ghost">
                 <X className="h-4 w-4" />
               </Button>
@@ -611,8 +613,8 @@ function FilesTab({ serverId }: { serverId: string }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead className="w-24 text-right">Size</TableHead>
-                <TableHead className="w-40 text-right">Modified</TableHead>
+                <TableHead className="hidden w-24 text-right sm:table-cell">Size</TableHead>
+                <TableHead className="hidden w-40 text-right sm:table-cell">Modified</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -647,10 +649,10 @@ function FilesTab({ serverId }: { serverId: string }) {
                       <ChevronRight className="h-3 w-3 text-muted-foreground" />
                     )}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
+                  <TableCell className="hidden text-right text-muted-foreground sm:table-cell">
                     {f.directory ? "-" : formatBytes(f.size)}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground text-xs">
+                  <TableCell className="hidden text-right text-muted-foreground text-xs sm:table-cell">
                     {new Date(f.modified).toLocaleString()}
                   </TableCell>
                 </TableRow>
@@ -696,7 +698,7 @@ function SettingsTab({
       <CardHeader>
         <CardTitle className="text-destructive">Danger Zone</CardTitle>
       </CardHeader>
-      <CardContent className="flex items-center justify-between">
+      <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-medium">Delete this server</p>
           <p className="text-muted-foreground text-sm">
@@ -780,7 +782,7 @@ function ActivityTab({ serverId }: { serverId: string }) {
                 <TableRow>
                   <TableHead>Event</TableHead>
                   <TableHead>User</TableHead>
-                  <TableHead>IP</TableHead>
+                  <TableHead className="hidden sm:table-cell">IP</TableHead>
                   <TableHead className="text-right">Time</TableHead>
                 </TableRow>
               </TableHeader>
@@ -795,7 +797,7 @@ function ActivityTab({ serverId }: { serverId: string }) {
                     <TableCell className="text-muted-foreground">
                       {entry.userName || entry.userId || "System"}
                     </TableCell>
-                    <TableCell className="font-mono text-muted-foreground text-xs">
+                    <TableCell className="hidden font-mono text-muted-foreground text-xs sm:table-cell">
                       {entry.ip || "-"}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground text-xs">
@@ -816,7 +818,7 @@ function ActivityTab({ serverId }: { serverId: string }) {
               </TableBody>
             </Table>
             {data && data.meta.total > data.meta.perPage && (
-              <div className="mt-4 flex items-center justify-between">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-muted-foreground text-sm">
                   Page {data.meta.page + 1} of{" "}
                   {Math.ceil(data.meta.total / data.meta.perPage)}

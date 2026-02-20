@@ -247,7 +247,7 @@ function NodeDetailPage() {
         )}
 
         {/* Live metrics — always visible */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           <MetricCard
             icon={<Cpu className="h-4 w-4" />}
             label="CPU"
@@ -284,12 +284,14 @@ function NodeDetailPage() {
 
         {/* Tabs outside card, content inside */}
         <Tabs defaultValue="overview">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="settings">
-              <Settings className="mr-1.5 h-3.5 w-3.5" /> Settings
-            </TabsTrigger>
-          </TabsList>
+          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="settings">
+                <Settings className="mr-1.5 h-3.5 w-3.5" /> Settings
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview">
             <Card>
@@ -446,7 +448,7 @@ function NodeDetailPage() {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-medium text-destructive text-sm">
                       Delete this node

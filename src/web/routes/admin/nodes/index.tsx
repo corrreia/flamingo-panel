@@ -111,7 +111,7 @@ function NodeRow({
           </Link>
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden md:table-cell">
         {node.url ? (
           <span className="font-mono text-muted-foreground text-sm">
             {node.url}
@@ -120,17 +120,17 @@ function NodeRow({
           <span className="text-muted-foreground text-xs">Not set</span>
         )}
       </TableCell>
-      <TableCell className="text-right text-muted-foreground">
+      <TableCell className="hidden text-right text-muted-foreground md:table-cell">
         {metrics.utilization
           ? `${metrics.utilization.cpu_percent.toFixed(1)}%`
           : "-"}
       </TableCell>
-      <TableCell className="text-right text-muted-foreground">
+      <TableCell className="hidden text-right text-muted-foreground md:table-cell">
         {metrics.utilization
           ? `${formatBytes(metrics.utilization.memory_used)} / ${formatBytes(metrics.utilization.memory_total)}`
           : "-"}
       </TableCell>
-      <TableCell className="text-right text-muted-foreground">
+      <TableCell className="hidden text-right text-muted-foreground md:table-cell">
         {metrics.utilization
           ? `${formatBytes(metrics.utilization.disk_used)} / ${formatBytes(metrics.utilization.disk_total)}`
           : "-"}
@@ -166,10 +166,10 @@ function NodesList({
             <TableRow>
               <TableHead className="w-12">#</TableHead>
               <TableHead>Name</TableHead>
-              <TableHead>Wings URL</TableHead>
-              <TableHead className="text-right">CPU</TableHead>
-              <TableHead className="text-right">Memory</TableHead>
-              <TableHead className="text-right">Disk</TableHead>
+              <TableHead className="hidden md:table-cell">Wings URL</TableHead>
+              <TableHead className="hidden text-right md:table-cell">CPU</TableHead>
+              <TableHead className="hidden text-right md:table-cell">Memory</TableHead>
+              <TableHead className="hidden text-right md:table-cell">Disk</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -381,7 +381,7 @@ function NodesPage() {
         </Dialog>
 
         {aggregate.hasData && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <StatCard
               icon={<Cpu className="h-4 w-4" />}
               label="CPU Usage"

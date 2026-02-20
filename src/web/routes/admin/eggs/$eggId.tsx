@@ -361,12 +361,14 @@ function EditEggPage() {
         {/* Tabbed Form */}
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="configuration">
-            <TabsList>
-              <TabsTrigger value="configuration">Configuration</TabsTrigger>
-              <TabsTrigger value="process">Process Management</TabsTrigger>
-              <TabsTrigger value="variables">Variables</TabsTrigger>
-              <TabsTrigger value="install">Install Script</TabsTrigger>
-            </TabsList>
+            <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+              <TabsList>
+                <TabsTrigger value="configuration">Configuration</TabsTrigger>
+                <TabsTrigger value="process">Process Management</TabsTrigger>
+                <TabsTrigger value="variables">Variables</TabsTrigger>
+                <TabsTrigger value="install">Install Script</TabsTrigger>
+              </TabsList>
+            </div>
 
             {/* ── Tab: Configuration ──────────────────────────────── */}
             <TabsContent value="configuration">
@@ -788,7 +790,7 @@ function EditEggPage() {
                 <AlertDescription>{deleteError}</AlertDescription>
               </Alert>
             )}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Delete this egg</p>
                 <p className="text-muted-foreground text-sm">

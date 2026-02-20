@@ -140,7 +140,7 @@ function ActivityLogPage() {
             }}
             value={serverId}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="All servers" />
             </SelectTrigger>
             <SelectContent>
@@ -159,7 +159,7 @@ function ActivityLogPage() {
             }}
             value={nodeId}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="All nodes" />
             </SelectTrigger>
             <SelectContent>
@@ -178,7 +178,7 @@ function ActivityLogPage() {
             }}
             value={userId}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="All users" />
             </SelectTrigger>
             <SelectContent>
@@ -191,7 +191,7 @@ function ActivityLogPage() {
           </Select>
 
           <Input
-            className="w-48"
+            className="w-full sm:w-48"
             onChange={(e) => {
               setEvent(e.target.value);
               setPage(0);
@@ -221,9 +221,9 @@ function ActivityLogPage() {
                 <TableRow>
                   <TableHead>Event</TableHead>
                   <TableHead>Server</TableHead>
-                  <TableHead>Node</TableHead>
+                  <TableHead className="hidden md:table-cell">Node</TableHead>
                   <TableHead>User</TableHead>
-                  <TableHead>IP</TableHead>
+                  <TableHead className="hidden md:table-cell">IP</TableHead>
                   <TableHead className="text-right">Time</TableHead>
                 </TableRow>
               </TableHeader>
@@ -248,13 +248,13 @@ function ActivityLogPage() {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
                       {entry.nodeName || "-"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {entry.userName || entry.userId || "System"}
                     </TableCell>
-                    <TableCell className="font-mono text-muted-foreground text-xs">
+                    <TableCell className="hidden font-mono text-muted-foreground text-xs md:table-cell">
                       {entry.ip || "-"}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground text-xs">
@@ -277,7 +277,7 @@ function ActivityLogPage() {
             </Table>
 
             {data && data.meta.total > data.meta.perPage && (
-              <div className="flex items-center justify-between border-t px-4 py-3">
+              <div className="flex flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-muted-foreground text-sm">
                   {data.meta.total} entries — Page {data.meta.page + 1} of{" "}
                   {Math.ceil(data.meta.total / data.meta.perPage)}
