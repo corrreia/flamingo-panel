@@ -3,10 +3,10 @@ import { useEffect, useRef, useState } from "react";
 
 export interface Utilization {
   cpu_percent: number;
-  memory_used: number;
-  memory_total: number;
-  disk_used: number;
   disk_total: number;
+  disk_used: number;
+  memory_total: number;
+  memory_used: number;
 }
 
 interface NodeMetricsState {

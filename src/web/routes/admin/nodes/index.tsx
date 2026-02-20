@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
-import { useNodeMetrics, type Utilization } from "@web/hooks/use-node-metrics";
+import { type Utilization, useNodeMetrics } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
 import {
