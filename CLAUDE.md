@@ -25,7 +25,7 @@ Default to using Bun instead of Node.js.
 - `src/web/components/` — shadcn/ui components + Layout
 - `src/web/lib/` — Frontend utilities (API client, auth context)
 - `src/api/` — Hono API routes (auth, servers, nodes, eggs, files, remote, activity)
-- `src/lib/` — Shared utilities (auth, wings-client, wings-jwt, rate-limit, egg-import, activity)
+- `src/lib/` — Shared utilities (auth, wings-client, wings-jwt, egg-import, activity)
 - `src/db/schema.ts` — Drizzle schema
 - `src/db/auth-schema.ts` — Better Auth tables (users, sessions, accounts, verifications)
 - `src/durable-objects/` — Durable Object classes (console-session, node-metrics)

@@ -64,7 +64,6 @@ src/
 │   ├── auth.ts                  # Session management (KV-based)
 │   ├── wings-client.ts          # HTTP client for Panel → Wings
 │   ├── wings-jwt.ts             # JWT signing for WebSocket tokens
-│   ├── rate-limit.ts            # KV-based rate limiting
 │   ├── egg-import.ts            # Pelican egg JSON parser
 │   └── activity.ts              # Activity logging helpers
 ├── db/
