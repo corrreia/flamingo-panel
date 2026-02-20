@@ -43,6 +43,7 @@ import { formatBytes } from "@web/lib/format";
 import {
   ArrowLeft,
   ChevronRight,
+  ClipboardList,
   Cpu,
   File,
   Folder,
@@ -185,6 +186,9 @@ function ServerPage() {
             <TabsTrigger value="settings">
               <Settings className="mr-2 h-4 w-4" /> Settings
             </TabsTrigger>
+            <TabsTrigger value="activity">
+              <ClipboardList className="mr-2 h-4 w-4" /> Activity
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="console">
             <ConsoleTab serverId={server.id} />
@@ -194,6 +198,9 @@ function ServerPage() {
           </TabsContent>
           <TabsContent value="settings">
             <SettingsTab serverId={server.id} serverName={server.name} />
+          </TabsContent>
+          <TabsContent value="activity">
+            <ActivityTab serverId={server.id} />
           </TabsContent>
         </Tabs>
       </div>
@@ -723,6 +730,121 @@ function SettingsTab({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ActivityEntry {
+  id: number;
+  event: string;
+  metadata: string | null;
+  ip: string | null;
+  createdAt: string;
+  userId: string | null;
+  userName: string | null;
+}
+
+interface ActivityResponse {
+  data: ActivityEntry[];
+  meta: { page: number; perPage: number; total: number };
+}
+
+function ActivityTab({ serverId }: { serverId: string }) {
+  const [page, setPage] = useState(0);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["server-activity", serverId, page],
+    queryFn: () =>
+      api.get<ActivityResponse>(
+        `/activity/server/${serverId}?page=${page}&per_page=25`
+      ),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Activity Log</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton className="h-10" key={i} />
+            ))}
+          </div>
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Event</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>IP</TableHead>
+                  <TableHead className="text-right">Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data?.data.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell>
+                      <Badge variant="secondary" className="font-mono text-xs">
+                        {entry.event}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {entry.userName || entry.userId || "System"}
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground text-xs">
+                      {entry.ip || "-"}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground text-xs">
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {data?.data.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      className="py-8 text-center text-muted-foreground"
+                      colSpan={4}
+                    >
+                      No activity recorded yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            {data && data.meta.total > data.meta.perPage && (
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-muted-foreground text-sm">
+                  Page {data.meta.page + 1} of{" "}
+                  {Math.ceil(data.meta.total / data.meta.perPage)}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      (page + 1) * data.meta.perPage >= data.meta.total
+                    }
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
