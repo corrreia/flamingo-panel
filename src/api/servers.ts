@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
+import { logActivity } from "../lib/activity";
 import { type ServerApiResponse, WingsClient } from "../lib/wings-client";
 import { signWingsWebsocketToken, WS_PERMISSIONS } from "../lib/wings-jwt";
 import {
@@ -10,7 +11,6 @@ import {
   buildServerEnvironment,
 } from "../services/wings-payload";
 import { type AuthUser, requireAuth } from "./middleware/auth";
-import { logActivity } from "../lib/activity";
 
 const HTTP_PROTOCOL_RE = /^http/;
 const TRAILING_SLASHES_RE = /\/+$/;
@@ -145,7 +145,12 @@ serverRoutes.post(
       // Wings might be offline, server record is still created
     }
 
-    logActivity(c, { event: "server:create", serverId: server.id, nodeId: data.nodeId, metadata: { name: data.name } });
+    logActivity(c, {
+      event: "server:create",
+      serverId: server.id,
+      nodeId: data.nodeId,
+      metadata: { name: data.name },
+    });
     return c.json(server, 201);
   }
 );
@@ -256,7 +261,11 @@ serverRoutes.post("/:id/reinstall", async (c) => {
 
   const client = new WingsClient(node);
   await client.createServer(buildInstallPayload(server, egg, environment));
-  logActivity(c, { event: "server:reinstall", serverId: server.id, nodeId: server.nodeId });
+  logActivity(c, {
+    event: "server:reinstall",
+    serverId: server.id,
+    nodeId: server.nodeId,
+  });
   return c.json({ ok: true });
 });
 
@@ -297,7 +306,12 @@ serverRoutes.post(
 
     const client = new WingsClient(node);
     await client.powerAction(server.uuid, action);
-    logActivity(c, { event: "server:power", serverId: server.id, nodeId: server.nodeId, metadata: { action } });
+    logActivity(c, {
+      event: "server:power",
+      serverId: server.id,
+      nodeId: server.nodeId,
+      metadata: { action },
+    });
     return c.body(null, 204);
   }
 );
@@ -339,7 +353,12 @@ serverRoutes.post(
 
     const client = new WingsClient(node);
     await client.sendCommand(server.uuid, [command]);
-    logActivity(c, { event: "server:command", serverId: server.id, nodeId: server.nodeId, metadata: { command } });
+    logActivity(c, {
+      event: "server:command",
+      serverId: server.id,
+      nodeId: server.nodeId,
+      metadata: { command },
+    });
     return c.body(null, 204);
   }
 );
@@ -444,7 +463,12 @@ serverRoutes.delete("/:id", async (c) => {
     }
   }
 
-  logActivity(c, { event: "server:delete", serverId: server.id, nodeId: server.nodeId, metadata: { name: server.name } });
+  logActivity(c, {
+    event: "server:delete",
+    serverId: server.id,
+    nodeId: server.nodeId,
+    metadata: { name: server.name },
+  });
   await db.delete(schema.servers).where(eq(schema.servers.id, server.id));
   return c.body(null, 204);
 });

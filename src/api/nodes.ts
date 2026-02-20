@@ -3,9 +3,9 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
+import { logActivity } from "../lib/activity";
 import { type SystemInfo, WingsClient } from "../lib/wings-client";
 import { generateApiKey } from "../services/api-keys";
-import { logActivity } from "../lib/activity";
 import { requireAdmin, requireAuth } from "./middleware/auth";
 
 export const nodeRoutes = new Hono<{ Bindings: Env }>();
@@ -92,7 +92,11 @@ nodeRoutes.post(
       `node-configure:${node.id}`
     );
 
-    logActivity(c, { event: "node:create", nodeId: node.id, metadata: { name: data.name } });
+    logActivity(c, {
+      event: "node:create",
+      nodeId: node.id,
+      metadata: { name: data.name },
+    });
 
     return c.json(
       {
@@ -130,7 +134,11 @@ nodeRoutes.put(
     if (!node) {
       return c.json({ error: "Node not found" }, 404);
     }
-    logActivity(c, { event: "node:update", nodeId: node.id, metadata: { name: node.name } });
+    logActivity(c, {
+      event: "node:update",
+      nodeId: node.id,
+      metadata: { name: node.name },
+    });
     return c.json(node);
   }
 );
@@ -202,8 +210,16 @@ nodeRoutes.delete("/:id", requireAdmin, async (c) => {
   if (servers.length > 0) {
     return c.json({ error: "Cannot delete node with active servers" }, 409);
   }
-  const nodeToDelete = await db.select({ name: schema.nodes.name }).from(schema.nodes).where(eq(schema.nodes.id, nodeId)).get();
-  logActivity(c, { event: "node:delete", nodeId, metadata: { name: nodeToDelete?.name } });
+  const nodeToDelete = await db
+    .select({ name: schema.nodes.name })
+    .from(schema.nodes)
+    .where(eq(schema.nodes.id, nodeId))
+    .get();
+  logActivity(c, {
+    event: "node:delete",
+    nodeId,
+    metadata: { name: nodeToDelete?.name },
+  });
   await db.delete(schema.nodes).where(eq(schema.nodes.id, nodeId));
   return c.body(null, 204);
 });

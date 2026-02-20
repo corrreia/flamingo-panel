@@ -12,9 +12,7 @@ export function logActivity(
 ) {
   const user = c.get("user" as never) as { id: string } | undefined;
   const ip =
-    c.req.header("cf-connecting-ip") ||
-    c.req.header("x-forwarded-for") ||
-    "";
+    c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "";
   const db = getDb(c.env.DB);
 
   const promise = db
@@ -27,8 +25,8 @@ export function logActivity(
       metadata: JSON.stringify(opts.metadata ?? {}),
       ip,
     })
-    .then(() => {})
-    .catch(() => {});
+    .then(() => undefined)
+    .catch(() => undefined);
 
   // Use waitUntil so the log insert doesn't block the response
   // and survives after the response is sent

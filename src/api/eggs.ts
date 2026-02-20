@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
-import { type NormalizedEgg, normalizeEgg } from "../lib/egg-import";
 import { logActivity } from "../lib/activity";
+import { type NormalizedEgg, normalizeEgg } from "../lib/egg-import";
 import { requireAdmin, requireAuth } from "./middleware/auth";
 
 export const eggRoutes = new Hono<{ Bindings: Env }>();
