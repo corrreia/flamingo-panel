@@ -95,7 +95,7 @@ nodeRoutes.post(
       {
         ...node,
         token: undefined,
-        configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id}`,
+        configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id} && systemctl restart wings`,
       },
       201
     );
@@ -151,7 +151,7 @@ nodeRoutes.post("/:id/reconfigure", requireAdmin, async (c) => {
   );
 
   return c.json({
-    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id}`,
+    configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id} && systemctl restart wings`,
   });
 });
 
