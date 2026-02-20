@@ -34,7 +34,16 @@ export class NodeMetrics extends DurableObject {
       // Send cached data immediately
       if (this.utilization) {
         server.send(
-          JSON.stringify({ event: "utilization", data: this.utilization })
+          JSON.stringify({
+            event: "utilization",
+            data: {
+              cpu_percent: this.utilization.cpu_percent,
+              memory_used: this.utilization.memory_used,
+              memory_total: this.utilization.memory_total,
+              disk_used: this.utilization.disk_used,
+              disk_total: this.utilization.disk_total,
+            },
+          })
         );
       }
 
