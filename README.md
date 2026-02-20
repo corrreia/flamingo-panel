@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://em-content.zobj.net/source/apple/391/flamingo_1fa69.png" width="120" />
+  <img src="https://upload.wikimedia.org/wikipedia/commons/6/68/Lightmatter_flamingo2.jpg" width="300" />
 </p>
 
 <h1 align="center">Flamingo Panel</h1>
@@ -22,7 +22,7 @@ Pelican Panel requires a PHP server, MySQL database, Redis, and a reverse proxy.
 - Admin UI for managing nodes (create, edit, delete, view system info)
 - `wings configure` auto-setup (one-time API key, configure command generation)
 - Wings connectivity check (online/offline status, OS/kernel/Docker info)
-- Egg import from Pelican JSON format
+- Egg import from Pelican JSON format (still a bit broken)
 - User registration and login
 
 ## TODO
