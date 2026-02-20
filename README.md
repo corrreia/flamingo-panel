@@ -22,8 +22,9 @@ Pelican Panel requires a PHP server, MySQL database, Redis, and a reverse proxy.
 - Admin UI for managing nodes (create, edit, delete, view system info)
 - `wings configure` auto-setup (one-time API key, configure command generation)
 - Wings connectivity check (online/offline status, OS/kernel/Docker info)
-- Egg import from Pelican JSON format (still a bit broken)
+- Egg management (import from Pelican JSON, list, detail, create)
 - User registration and login
+- Activity logging (admin page with filters/pagination, server activity tab)
 
 ## TODO
 
@@ -36,7 +37,6 @@ Pelican Panel requires a PHP server, MySQL database, Redis, and a reverse proxy.
 - [ ] Server backups (Wings backup API integration)
 - [ ] Subuser permissions
 - [ ] Server schedules / tasks
-- [ ] Activity logging
 - [ ] Server resource usage monitoring
 - [ ] Production deployment and setup docs
 
