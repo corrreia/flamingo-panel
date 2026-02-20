@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
 import { WingsClient } from "../lib/wings-client";
+import { logActivity } from "../lib/activity";
 import { type AuthUser, requireAuth } from "./middleware/auth";
 
 interface FileEnv {
@@ -85,6 +86,7 @@ fileRoutes.post("/:serverId/files/write", async (c) => {
   }
   const body = await c.req.text();
   await result.client.writeFile(result.server.uuid, file, body);
+  logActivity(c, { event: "file:write", serverId: result.server.id, nodeId: result.server.nodeId, metadata: { file } });
   return c.body(null, 204);
 });
 
@@ -105,6 +107,7 @@ fileRoutes.put(
     }
     const { root, files } = c.req.valid("json");
     await result.client.renameFiles(result.server.uuid, root, files);
+    logActivity(c, { event: "file:rename", serverId: result.server.id, nodeId: result.server.nodeId, metadata: { root, files } });
     return c.body(null, 204);
   }
 );
@@ -127,6 +130,7 @@ fileRoutes.post(
       result.server.uuid,
       c.req.valid("json").location
     );
+    logActivity(c, { event: "file:copy", serverId: result.server.id, nodeId: result.server.nodeId, metadata: { location: c.req.valid("json").location } });
     return c.body(null, 204);
   }
 );
@@ -148,6 +152,7 @@ fileRoutes.post(
     }
     const { root, files } = c.req.valid("json");
     await result.client.deleteFiles(result.server.uuid, root, files);
+    logActivity(c, { event: "file:delete", serverId: result.server.id, nodeId: result.server.nodeId, metadata: { root, files } });
     return c.body(null, 204);
   }
 );
@@ -169,6 +174,7 @@ fileRoutes.post(
     }
     const { name, path } = c.req.valid("json");
     await result.client.createDirectory(result.server.uuid, name, path);
+    logActivity(c, { event: "file:create-directory", serverId: result.server.id, nodeId: result.server.nodeId, metadata: { name, path } });
     return c.body(null, 204);
   }
 );
@@ -194,6 +200,7 @@ fileRoutes.post(
       root,
       files
     );
+    logActivity(c, { event: "file:compress", serverId: result.server.id, nodeId: result.server.nodeId, metadata: { root, files } });
     return c.json(stat);
   }
 );
@@ -215,6 +222,7 @@ fileRoutes.post(
     }
     const { root, file } = c.req.valid("json");
     await result.client.decompressFile(result.server.uuid, root, file);
+    logActivity(c, { event: "file:decompress", serverId: result.server.id, nodeId: result.server.nodeId, metadata: { root, file } });
     return c.body(null, 204);
   }
 );
