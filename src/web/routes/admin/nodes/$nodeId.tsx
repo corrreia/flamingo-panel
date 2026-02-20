@@ -47,11 +47,7 @@ import { useState } from "react";
 
 interface NodeDetail {
   createdAt: string;
-  disk: number;
-  diskOverallocate: number;
   id: number;
-  memory: number;
-  memoryOverallocate: number;
   name: string;
   stats: {
     version: string;

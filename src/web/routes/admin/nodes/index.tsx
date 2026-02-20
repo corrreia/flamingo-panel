@@ -42,11 +42,8 @@ import { useCallback, useMemo, useState } from "react";
 import type { SystemInfo, SystemUtilization } from "../../../lib/wings-client";
 
 interface NodeItem {
-  cpuThreads: number;
   createdAt: string;
-  disk: number;
   id: number;
-  memory: number;
   name: string;
   url: string;
 }
@@ -133,17 +130,17 @@ function NodeRow({
       <TableCell className="text-right text-muted-foreground">
         {metrics.systemInfo
           ? `${metrics.systemInfo.system.cpu_threads} cores`
-          : (node.cpuThreads > 0 && `${node.cpuThreads} cores`) || "-"}
+          : "-"}
       </TableCell>
       <TableCell className="text-right text-muted-foreground">
         {metrics.systemInfo
           ? formatBytes(metrics.systemInfo.system.memory_bytes)
-          : (node.memory > 0 && `${node.memory} MB`) || "-"}
+          : "-"}
       </TableCell>
       <TableCell className="text-right text-muted-foreground">
         {metrics.utilization
           ? formatBytes(metrics.utilization.disk_total)
-          : (node.disk > 0 && `${node.disk} MB`) || "-"}
+          : "-"}
       </TableCell>
     </TableRow>
   );
