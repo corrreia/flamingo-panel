@@ -377,3 +377,31 @@ serverRoutes.get("/:id/console", async (c) => {
     }),
   }));
 });
+
+// Delete server
+serverRoutes.delete("/:id", async (c) => {
+  const user = c.get("user");
+  const db = getDb(c.env.DB);
+  const server = await db.select().from(schema.servers)
+    .where(eq(schema.servers.id, c.req.param("id"))).get();
+
+  if (!server) return c.json({ error: "Server not found" }, 404);
+  if (user.role !== "admin" && server.ownerId !== user.id) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+
+  // Remove from Wings node
+  const node = await db.select().from(schema.nodes)
+    .where(eq(schema.nodes.id, server.nodeId)).get();
+  if (node) {
+    try {
+      const client = new WingsClient(node);
+      await client.deleteServer(server.uuid);
+    } catch {
+      // Wings might be offline, proceed with DB deletion
+    }
+  }
+
+  await db.delete(schema.servers).where(eq(schema.servers.id, server.id));
+  return c.body(null, 204);
+});

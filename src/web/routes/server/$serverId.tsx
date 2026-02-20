@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@web/lib/api";
 import { Layout } from "@web/components/layout";
@@ -16,8 +17,13 @@ import {
 import {
   Play, Square, RotateCcw, Skull, Terminal, FolderOpen,
   Settings, Cpu, MemoryStick, HardDrive, Wifi, WifiOff,
-  File, Folder, ChevronRight, ArrowLeft, Save, X,
+  File, Folder, ChevronRight, ArrowLeft, Save, X, Trash2,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@web/components/ui/alert-dialog";
 
 interface ServerDetail {
   id: string;
@@ -118,7 +124,7 @@ function ServerPage() {
             <FilesTab serverId={server.id} />
           </TabsContent>
           <TabsContent value="settings">
-            <Card><CardContent className="py-8 text-center text-muted-foreground">Settings coming soon.</CardContent></Card>
+            <SettingsTab serverId={server.id} serverName={server.name} />
           </TabsContent>
         </Tabs>
       </div>
@@ -397,6 +403,60 @@ function FilesTab({ serverId }: { serverId: string }) {
             </TableBody>
           </Table>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SettingsTab({ serverId, serverName }: { serverId: string; serverName: string }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/servers/${serverId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["servers"] });
+      navigate({ to: "/" });
+    },
+  });
+
+  return (
+    <Card className="border-destructive">
+      <CardHeader>
+        <CardTitle className="text-destructive">Danger Zone</CardTitle>
+      </CardHeader>
+      <CardContent className="flex items-center justify-between">
+        <div>
+          <p className="font-medium">Delete this server</p>
+          <p className="text-sm text-muted-foreground">
+            Permanently remove this server and all its data. This cannot be undone.
+          </p>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive">
+              <Trash2 className="h-4 w-4 mr-2" /> Delete Server
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete server "{serverName}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently remove the server and all its data from both the panel and the node. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteMutation.isPending ? "Deleting..." : "Delete Server"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );

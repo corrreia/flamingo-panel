@@ -18,7 +18,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@web/components/ui/table";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
-import { Egg, Plus, Upload, ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@web/components/ui/alert-dialog";
+import { Egg, Plus, Upload, ArrowLeft, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 
 interface EggItem {
   id: string;
@@ -197,6 +202,12 @@ function EggsPage() {
 
 function EggRow({ egg }: { egg: EggItem }) {
   const [expanded, setExpanded] = useState(false);
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/eggs/${egg.id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["eggs"] }),
+  });
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["egg", egg.id],
@@ -206,15 +217,42 @@ function EggRow({ egg }: { egg: EggItem }) {
 
   return (
     <Card>
-      <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
             {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             <Egg className="h-4 w-4 text-primary" />
             <CardTitle className="text-base">{egg.name}</CardTitle>
             {egg.description && <span className="text-sm text-muted-foreground">{egg.description}</span>}
           </div>
-          <Badge variant="secondary" className="font-mono text-xs">{egg.dockerImage.split("/").pop() || egg.dockerImage}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-mono text-xs">{egg.dockerImage.split("/").pop() || egg.dockerImage}</Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => e.stopPropagation()}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete egg "{egg.name}"?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove this egg and all its variables. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteMutation.mutate()}
+                    disabled={deleteMutation.isPending}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteMutation.isPending ? "Deleting..." : "Delete Egg"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </CardHeader>
       {expanded && (

@@ -86,3 +86,22 @@ eggRoutes.post("/import", requireAdmin, async (c) => {
 
   return c.json(egg, 201);
 });
+
+// Delete egg (blocks if servers are using it)
+eggRoutes.delete("/:id", async (c) => {
+  const db = getDb(c.env.DB);
+  const egg = await db.select().from(schema.eggs)
+    .where(eq(schema.eggs.id, c.req.param("id"))).get();
+
+  if (!egg) return c.json({ error: "Egg not found" }, 404);
+
+  const serversUsingEgg = await db.select().from(schema.servers)
+    .where(eq(schema.servers.eggId, egg.id)).all();
+
+  if (serversUsingEgg.length > 0) {
+    return c.json({ error: "Cannot delete egg with active servers" }, 409);
+  }
+
+  await db.delete(schema.eggs).where(eq(schema.eggs.id, egg.id));
+  return c.body(null, 204);
+});

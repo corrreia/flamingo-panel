@@ -6,6 +6,9 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig({
+  server: {
+    allowedHosts: [".trycloudflare.com"],
+  },
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tanstackStart({

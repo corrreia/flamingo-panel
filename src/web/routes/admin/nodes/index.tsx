@@ -16,6 +16,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@web/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@web/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   Network, Plus, Trash2, ArrowLeft, Wifi, WifiOff,
@@ -93,11 +98,6 @@ function NodesPage() {
       memory: parseInt(memory) || 0,
       disk: parseInt(disk) || 0,
     });
-  };
-
-  const handleDelete = (id: number, nodeName: string) => {
-    if (!confirm(`Delete node "${nodeName}"? This cannot be undone.`)) return;
-    deleteMutation.mutate(id);
   };
 
   const copyToClipboard = (text: string) => {
@@ -218,9 +218,31 @@ function NodesPage() {
                     <TableCell className="text-right text-muted-foreground">{node.memory > 0 ? `${node.memory} MB` : "-"}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{node.disk > 0 ? `${node.disk} MB` : "-"}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(node.id, node.name)} className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete node "{node.name}"?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove this node. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMutation.mutate(node.id)}
+                              disabled={deleteMutation.isPending}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {deleteMutation.isPending ? "Deleting..." : "Delete Node"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}
