@@ -171,8 +171,10 @@ remoteRoutes.post("/servers/:uuid/container/status", (c) => {
 
 // POST /api/remote/activity - Wings sends activity logs
 remoteRoutes.post("/activity", async (c) => {
+  const node = c.get("node");
   const body = (await c.req.json()) as {
     data: Array<{
+      server: string; // server UUID
       event: string;
       metadata: Record<string, unknown>;
       ip: string;
@@ -181,9 +183,25 @@ remoteRoutes.post("/activity", async (c) => {
   };
   const db = getDb(c.env.DB);
 
+  // Build a map of server UUIDs to server IDs (avoid repeated lookups)
+  const serverUuids = [...new Set(body.data.map((a) => a.server).filter(Boolean))];
+  const serverMap = new Map<string, string>();
+  for (const uuid of serverUuids) {
+    const server = await db
+      .select({ id: schema.servers.id })
+      .from(schema.servers)
+      .where(eq(schema.servers.uuid, uuid))
+      .get();
+    if (server) {
+      serverMap.set(uuid, server.id);
+    }
+  }
+
   for (const activity of body.data) {
     await db.insert(schema.activityLogs).values({
       userId: activity.user || null,
+      serverId: serverMap.get(activity.server) ?? null,
+      nodeId: node.id,
       event: activity.event,
       metadata: JSON.stringify(activity.metadata),
       ip: activity.ip,
