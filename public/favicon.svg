@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="head" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF8AB5"/>
+      <stop offset="100%" stop-color="#FF4081"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Head -->
+  <ellipse cx="36" cy="28" rx="22" ry="20" fill="url(#head)"/>
+
+  <!-- Beak -->
+  <path d="M18 30 L2 36 Q0 32 2 28 L18 24 Z" fill="#1A1A2E"/>
+  <line x1="18" y1="27" x2="4" y2="32" stroke="#2D2D44" stroke-width="0.5"/>
+
+  <!-- Eye -->
+  <circle cx="30" cy="24" r="5" fill="white"/>
+  <circle cx="29" cy="24" r="3" fill="#1A1A2E"/>
+  <circle cx="28" cy="23" r="1" fill="white"/>
+
+  <!-- Blush -->
+  <circle cx="25" cy="33" r="5" fill="#FF4081" opacity="0.3"/>
+
+  <!-- Crest tuft -->
+  <path d="M48 18 Q54 8 50 4 Q48 6 46 14" fill="#FF6B9D" opacity="0.8"/>
+  <path d="M44 16 Q48 6 44 2 Q42 5 42 13" fill="#E91E63" opacity="0.6"/>
+</svg>
