@@ -237,7 +237,7 @@ function NodeDetailPage() {
             </CardHeader>
             <CardContent>
               {(() => {
-                const info = metrics.systemInfo ?? node.stats;
+                const info = node.stats;
                 if (!info) {
                   return (
                     <p className="text-muted-foreground text-sm">

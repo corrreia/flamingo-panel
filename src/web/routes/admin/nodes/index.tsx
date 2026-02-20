@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
-import { useNodeMetrics } from "@web/hooks/use-node-metrics";
+import { useNodeMetrics, type Utilization } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
 import {
@@ -39,7 +39,6 @@ import {
   Plus,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import type { SystemInfo, SystemUtilization } from "../../../lib/wings-client";
 
 interface NodeItem {
   createdAt: string;
@@ -53,10 +52,9 @@ interface CreatedNode extends NodeItem {
 }
 
 interface NodeMetricsReport {
-  connected: boolean;
   nodeId: number;
-  systemInfo: SystemInfo | null;
-  utilization: SystemUtilization | null;
+  utilization: Utilization | null;
+  wingsOnline: boolean;
 }
 
 function NodeRow({
@@ -71,27 +69,22 @@ function NodeRow({
   // Report metrics to parent for aggregation
   const prevRef = useMemo(
     () => ({
-      connected: false,
-      systemInfo: null as SystemInfo | null,
-      utilization: null as SystemUtilization | null,
+      wingsOnline: false,
+      utilization: null as Utilization | null,
     }),
     []
   );
 
   if (
-    metrics.connected !== prevRef.connected ||
-    metrics.systemInfo !== prevRef.systemInfo ||
+    metrics.wingsOnline !== prevRef.wingsOnline ||
     metrics.utilization !== prevRef.utilization
   ) {
-    prevRef.connected = metrics.connected;
-    prevRef.systemInfo = metrics.systemInfo;
+    prevRef.wingsOnline = metrics.wingsOnline;
     prevRef.utilization = metrics.utilization;
-    // Schedule report to avoid calling during render
     queueMicrotask(() =>
       onMetrics({
         nodeId: node.id,
-        connected: metrics.connected,
-        systemInfo: metrics.systemInfo,
+        wingsOnline: metrics.wingsOnline,
         utilization: metrics.utilization,
       })
     );
@@ -128,18 +121,18 @@ function NodeRow({
         )}
       </TableCell>
       <TableCell className="text-right text-muted-foreground">
-        {metrics.systemInfo
-          ? `${metrics.systemInfo.system.cpu_threads} cores`
-          : "-"}
-      </TableCell>
-      <TableCell className="text-right text-muted-foreground">
-        {metrics.systemInfo
-          ? formatBytes(metrics.systemInfo.system.memory_bytes)
+        {metrics.utilization
+          ? `${metrics.utilization.cpu_percent.toFixed(1)}%`
           : "-"}
       </TableCell>
       <TableCell className="text-right text-muted-foreground">
         {metrics.utilization
-          ? formatBytes(metrics.utilization.disk_total)
+          ? `${formatBytes(metrics.utilization.memory_used)} / ${formatBytes(metrics.utilization.memory_total)}`
+          : "-"}
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">
+        {metrics.utilization
+          ? `${formatBytes(metrics.utilization.disk_used)} / ${formatBytes(metrics.utilization.disk_total)}`
           : "-"}
       </TableCell>
     </TableRow>
@@ -227,7 +220,6 @@ function NodesPage() {
   }, []);
 
   const aggregate = useMemo(() => {
-    let totalCpuThreads = 0;
     let cpuUsageSum = 0;
     let cpuUsageCount = 0;
     let memoryUsed = 0;
@@ -236,9 +228,6 @@ function NodesPage() {
     let diskTotal = 0;
 
     for (const report of metricsMap.values()) {
-      if (report.systemInfo) {
-        totalCpuThreads += report.systemInfo.system.cpu_threads;
-      }
       if (report.utilization) {
         cpuUsageSum += report.utilization.cpu_percent;
         cpuUsageCount++;
@@ -250,7 +239,6 @@ function NodesPage() {
     }
 
     return {
-      totalCpuThreads,
       cpuUsage: cpuUsageCount > 0 ? cpuUsageSum / cpuUsageCount : 0,
       memoryUsed,
       memoryTotal,
@@ -393,12 +381,7 @@ function NodesPage() {
         </Dialog>
 
         {aggregate.hasData && (
-          <div className="grid grid-cols-4 gap-4">
-            <StatCard
-              icon={<Cpu className="h-4 w-4" />}
-              label="Total CPUs"
-              value={String(aggregate.totalCpuThreads)}
-            />
+          <div className="grid grid-cols-3 gap-4">
             <StatCard
               icon={<Cpu className="h-4 w-4" />}
               label="CPU Usage"
