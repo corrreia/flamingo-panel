@@ -1,10 +1,44 @@
-# Flamingo Panel
+<p align="center">
+  <img src="https://em-content.zobj.net/source/apple/391/flamingo_1fa69.png" width="120" />
+</p>
+
+<h1 align="center">Flamingo Panel</h1>
+
+<p align="center">
+  <strong>Game server management on Cloudflare's edge.</strong>
+</p>
+
+> **This project is in early development and does not work yet.**
+> The only functional piece so far is node management — you can add Wings nodes, configure them via `wings configure`, and see their system info. Server creation, installation, console, and file management are all still broken or incomplete.
 
 An open-source game server management panel built entirely on Cloudflare's stack. Drop-in replacement for [Pelican Panel](https://pelican.dev) — reuses existing Pelican Wings nodes, eggs, and the same server management workflow, but runs serverless on Cloudflare Workers.
 
 ## Why
 
 Pelican Panel requires a PHP server, MySQL database, Redis, and a reverse proxy. Flamingo replaces all of that with a single Cloudflare Worker — no servers to manage, no infrastructure to maintain.
+
+## What Works
+
+- Admin UI for managing nodes (create, edit, delete, view system info)
+- `wings configure` auto-setup (one-time API key, configure command generation)
+- Wings connectivity check (online/offline status, OS/kernel/Docker info)
+- Egg import from Pelican JSON format
+- User registration and login
+
+## TODO
+
+- [ ] Server installation on Wings (payload is sent but install flow is incomplete)
+- [ ] Server console (WebSocket proxy via Durable Objects — partially built)
+- [ ] File manager (proxies to Wings — partially built)
+- [ ] Power actions (start/stop/restart/kill)
+- [ ] OpenID Connect / OAuth authentication (replace password auth)
+- [ ] Cloudflare Tunnel integration for automatic Wings connectivity
+- [ ] Server backups (Wings backup API integration)
+- [ ] Subuser permissions
+- [ ] Server schedules / tasks
+- [ ] Activity logging
+- [ ] Server resource usage monitoring
+- [ ] Production deployment and setup docs
 
 ## Stack
 
