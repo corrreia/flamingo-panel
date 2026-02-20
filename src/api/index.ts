@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
 import { generateApiKey } from "../services/api-keys";
+import { activityRoutes } from "./activity";
 import { applicationRoutes } from "./application";
 import { authRoutes } from "./auth";
 import { eggRoutes } from "./eggs";
@@ -96,6 +97,7 @@ apiRoutes.get("/servers/:id/console", async (c) => {
 });
 
 // Sub-routers (these apply their own auth middleware)
+apiRoutes.route("/activity", activityRoutes);
 apiRoutes.route("/auth", authRoutes);
 apiRoutes.route("/nodes", nodeRoutes);
 apiRoutes.route("/servers", serverRoutes);
