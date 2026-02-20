@@ -13,6 +13,14 @@ Browser ──→ Cloudflare Worker ──→ Wings Node(s)
                └── Durable Objects (WebSocket proxy)
 ```
 
+**Users never talk to Wings directly.** All communication flows through the Worker:
+
+```
+Wings ──→ DO/Worker ──→ Frontend
+```
+
+The frontend only talks to the Cloudflare Worker API. The Worker proxies everything to/from Wings. This means Wings nodes don't need to be publicly exposed to end users — only the Worker needs to reach them.
+
 ## Communication Flow
 
 ```
@@ -21,9 +29,9 @@ Wings → Panel:  HTTP via PANEL_URL (Bearer tokenId.token auth)
 Browser → Console:  WebSocket via Durable Object → Wings WebSocket
 ```
 
-- **Panel to Wings:** Direct HTTP calls using the node's raw `token` for auth. The node URL is typically a cloudflared tunnel.
-- **Wings to Panel:** Wings calls `/api/remote/*` endpoints using `tokenId.token` format. This is how Wings syncs server state, reports activity, etc.
-- **Console WebSocket:** Browser gets a short-lived ticket, connects to a Durable Object which proxies the WebSocket to Wings using a signed JWT.
+- **Panel to Wings:** Worker makes HTTP calls to Wings using the node's raw `token` for auth. The node URL is typically a cloudflared tunnel.
+- **Wings to Panel:** Wings calls `/api/remote/*` endpoints on the Worker using `tokenId.token` format. This is how Wings syncs server state, reports activity, etc.
+- **Console WebSocket:** Browser connects to a Durable Object on the Worker, which proxies the WebSocket to Wings using a signed JWT. The browser never connects to Wings directly.
 
 ## Project Structure
 
