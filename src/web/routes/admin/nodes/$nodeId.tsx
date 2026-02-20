@@ -15,10 +15,7 @@ import {
 } from "@web/components/ui/alert-dialog";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
-import {
-  Card,
-  CardContent,
-} from "@web/components/ui/card";
+import { Card, CardContent } from "@web/components/ui/card";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
 import { Separator } from "@web/components/ui/separator";
@@ -315,10 +312,7 @@ function NodeDetailPage() {
                       />
                     </div>
                     <div className="divide-y">
-                      <InfoRow
-                        label="Wings"
-                        value={`v${node.stats.version}`}
-                      />
+                      <InfoRow label="Wings" value={`v${node.stats.version}`} />
                       <InfoRow
                         label="Docker"
                         value={node.stats.docker.version}

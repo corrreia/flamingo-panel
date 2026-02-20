@@ -184,7 +184,9 @@ remoteRoutes.post("/activity", async (c) => {
   const db = getDb(c.env.DB);
 
   // Build a map of server UUIDs to server IDs (avoid repeated lookups)
-  const serverUuids = [...new Set(body.data.map((a) => a.server).filter(Boolean))];
+  const serverUuids = [
+    ...new Set(body.data.map((a) => a.server).filter(Boolean)),
+  ];
   const serverMap = new Map<string, string>();
   for (const uuid of serverUuids) {
     const server = await db

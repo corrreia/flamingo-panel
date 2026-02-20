@@ -736,11 +736,11 @@ function SettingsTab({
 }
 
 interface ActivityEntry {
-  id: number;
-  event: string;
-  metadata: string | null;
-  ip: string | null;
   createdAt: string;
+  event: string;
+  id: number;
+  ip: string | null;
+  metadata: string | null;
   userId: string | null;
   userName: string | null;
 }
@@ -788,7 +788,7 @@ function ActivityTab({ serverId }: { serverId: string }) {
                 {data?.data.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell>
-                      <Badge variant="secondary" className="font-mono text-xs">
+                      <Badge className="font-mono text-xs" variant="secondary">
                         {entry.event}
                       </Badge>
                     </TableCell>
@@ -823,20 +823,18 @@ function ActivityTab({ serverId }: { serverId: string }) {
                 </span>
                 <div className="flex gap-2">
                   <Button
-                    size="sm"
-                    variant="outline"
                     disabled={page === 0}
                     onClick={() => setPage((p) => p - 1)}
+                    size="sm"
+                    variant="outline"
                   >
                     Previous
                   </Button>
                   <Button
+                    disabled={(page + 1) * data.meta.perPage >= data.meta.total}
+                    onClick={() => setPage((p) => p + 1)}
                     size="sm"
                     variant="outline"
-                    disabled={
-                      (page + 1) * data.meta.perPage >= data.meta.total
-                    }
-                    onClick={() => setPage((p) => p + 1)}
                   >
                     Next
                   </Button>

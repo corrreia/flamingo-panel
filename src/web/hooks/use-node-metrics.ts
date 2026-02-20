@@ -79,7 +79,11 @@ export function useNodeMetrics(
         };
 
         ws.onclose = () => {
-          setState((prev) => ({ ...prev, connected: false, wingsOnline: false }));
+          setState((prev) => ({
+            ...prev,
+            connected: false,
+            wingsOnline: false,
+          }));
         };
       })
       .catch(() => {

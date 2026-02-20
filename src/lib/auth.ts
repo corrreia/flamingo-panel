@@ -11,9 +11,7 @@ import * as authSchema from "../db/auth-schema";
  */
 export function createAuth(env: Env, requestUrl?: string) {
   const db = drizzle(env.DB);
-  const baseURL = requestUrl
-    ? new URL(requestUrl).origin
-    : env.PANEL_URL;
+  const baseURL = requestUrl ? new URL(requestUrl).origin : env.PANEL_URL;
 
   return betterAuth({
     baseURL,
