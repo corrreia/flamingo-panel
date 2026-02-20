@@ -5,7 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "routes": [
-    { "pattern": "flamingo.tomascorreia.net", "zone_name": "tomascorreia.net" }
+    { "pattern": "flamingo.tomascorreia.net/*", "zone_name": "tomascorreia.net" }
   ],
   "vars": {
     "PANEL_URL": "https://flamingo.tomascorreia.net",
@@ -30,7 +30,7 @@
       "bucket_name": "flamingo-r2"
     }
   ],
-  "rate_limits": [
+  "ratelimits": [
     {
       "name": "AUTH_RATE_LIMIT",
       "namespace_id": "1001",
