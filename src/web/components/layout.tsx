@@ -9,14 +9,14 @@ import {
   DropdownMenuTrigger,
 } from "@web/components/ui/dropdown-menu";
 import { useAuth } from "@web/lib/auth";
-import { Egg, LogOut, Network, Plus, Server, Settings } from "lucide-react";
+import { ClipboardList, Egg, LogOut, Network, Plus, Server, Settings } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <nav className="flex items-center justify-between border-border border-b px-6 py-3">
+      <nav className="relative flex items-center justify-between overflow-hidden border-border border-b px-6 py-3">
         <div className="flex items-center gap-1">
           <Link className="mr-4 font-bold text-primary text-xl" to="/">
             Flamingo
@@ -41,6 +41,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Button asChild size="sm" variant="ghost">
                 <Link to="/admin/create-server">
                   <Plus className="mr-2 h-4 w-4" /> Create Server
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="ghost">
+                <Link to="/admin/activity">
+                  <ClipboardList className="mr-2 h-4 w-4" /> Activity
                 </Link>
               </Button>
             </>
@@ -72,6 +77,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <img
+          alt="Flamingo"
+          height={100}
+          src="/flamingo-head.svg"
+          width={75}
+          className="pointer-events-none absolute top-0 right-8 translate-y-[-10px]"
+        />
       </nav>
       <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
     </div>
