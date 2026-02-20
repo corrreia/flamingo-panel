@@ -29,11 +29,6 @@ export const nodes = sqliteTable("nodes", {
   url: text("url").notNull().default(""), // full Wings URL e.g. https://wings.example.com
   tokenId: text("token_id").notNull(),
   token: text("token").notNull(),
-  memory: integer("memory").notNull().default(0),
-  memoryOverallocate: integer("memory_overallocate").notNull().default(0),
-  disk: integer("disk").notNull().default(0),
-  diskOverallocate: integer("disk_overallocate").notNull().default(0),
-  cpuThreads: integer("cpu_threads").notNull().default(0),
   uploadSize: integer("upload_size").notNull().default(100),
   ...timestamps,
 });
