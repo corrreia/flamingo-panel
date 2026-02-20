@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import type { SystemInfo, SystemUtilization } from "../lib/wings-client";
+import type { SystemUtilization } from "../lib/wings-client";
 
 const POLL_INTERVAL_MS = 5000;
 const TRAILING_SLASH_RE = /\/+$/;
@@ -7,7 +7,6 @@ const TRAILING_SLASH_RE = /\/+$/;
 export class NodeMetrics extends DurableObject {
   private wingsUrl: string | null = null;
   private wingsToken: string | null = null;
-  private systemInfo: SystemInfo | null = null;
   private utilization: SystemUtilization | null = null;
 
   async fetch(request: Request): Promise<Response> {
@@ -33,20 +32,10 @@ export class NodeMetrics extends DurableObject {
       this.ctx.acceptWebSocket(server);
 
       // Send cached data immediately
-      if (this.systemInfo) {
-        server.send(
-          JSON.stringify({ event: "system_info", data: this.systemInfo })
-        );
-      }
       if (this.utilization) {
         server.send(
           JSON.stringify({ event: "utilization", data: this.utilization })
         );
-      }
-
-      // Fetch systemInfo from Wings if not cached
-      if (!this.systemInfo) {
-        this.fetchSystemInfo();
       }
 
       // Start alarm chain if not already running
@@ -88,31 +77,6 @@ export class NodeMetrics extends DurableObject {
     }
   }
 
-  private async fetchSystemInfo() {
-    if (!(this.wingsUrl && this.wingsToken)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`${this.wingsUrl}/api/system?v=2`, {
-        headers: {
-          Authorization: `Bearer ${this.wingsToken}`,
-          Accept: "application/json",
-        },
-      });
-      if (!res.ok) {
-        throw new Error(`Wings ${res.status}`);
-      }
-      this.systemInfo = (await res.json()) as SystemInfo;
-      this.broadcast({ event: "system_info", data: this.systemInfo });
-    } catch (err) {
-      this.broadcast({
-        event: "error",
-        data: `Failed to fetch system info: ${err instanceof Error ? err.message : "unknown"}`,
-      });
-    }
-  }
-
   private async fetchUtilization() {
     if (!(this.wingsUrl && this.wingsToken)) {
       return;
@@ -128,8 +92,18 @@ export class NodeMetrics extends DurableObject {
       if (!res.ok) {
         throw new Error(`Wings ${res.status}`);
       }
-      this.utilization = (await res.json()) as SystemUtilization;
-      this.broadcast({ event: "utilization", data: this.utilization });
+      const raw = (await res.json()) as SystemUtilization;
+      this.utilization = raw;
+      this.broadcast({
+        event: "utilization",
+        data: {
+          cpu_percent: raw.cpu_percent,
+          memory_used: raw.memory_used,
+          memory_total: raw.memory_total,
+          disk_used: raw.disk_used,
+          disk_total: raw.disk_total,
+        },
+      });
     } catch (err) {
       this.broadcast({
         event: "error",
