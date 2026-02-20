@@ -24,9 +24,13 @@ Default to using Bun instead of Node.js.
 - `src/web/router.tsx` — Router config + QueryClient setup
 - `src/web/components/` — shadcn/ui components + Layout
 - `src/web/lib/` — Frontend utilities (API client, auth context)
-- `src/api/` — Hono API routes (auth, servers, nodes, eggs, files, remote)
+- `src/api/` — Hono API routes (auth, servers, nodes, eggs, files, remote, activity)
+- `src/lib/` — Shared utilities (auth, wings-client, wings-jwt, rate-limit, egg-import, activity)
 - `src/db/schema.ts` — Drizzle schema
-- `src/durable-objects/` — Durable Object classes
+- `src/db/auth-schema.ts` — Better Auth tables (users, sessions, accounts, verifications)
+- `src/durable-objects/` — Durable Object classes (console-session, node-metrics)
+- `src/services/` — Service layer (api-keys, wings-payload)
+- `src/web/hooks/` — Custom React hooks (e.g. use-node-metrics)
 - `wrangler.jsonc` — Cloudflare Worker config (D1, KV, R2, DO bindings)
 - `vite.config.ts` — Vite + TanStack Start + Cloudflare plugin config
 
