@@ -71,6 +71,7 @@ function getStepClassName(i: number, step: number): string {
   return "bg-muted text-muted-foreground";
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-step wizard component
 function CreateServerPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);

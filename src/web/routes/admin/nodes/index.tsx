@@ -138,8 +138,8 @@ function renderNodesList(
                           Delete node "{node.name}"?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently remove this node. This
-                          action cannot be undone.
+                          This will permanently remove this node. This action
+                          cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
