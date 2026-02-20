@@ -26,6 +26,13 @@
       "bucket_name": "flamingo-files"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
