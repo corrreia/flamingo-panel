@@ -5,8 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "PANEL_URL": "https://urw-marks-growing-bacterial.trycloudflare.com",
-    // Pocket ID OIDC discovery URL (public — no secret)
-    "OIDC_DISCOVERY_URL": "https://id.yourdomain.com/.well-known/openid-configuration"
+    "OIDC_DISCOVERY_URL": "https://auth.tomascorreia.net/.well-known/openid-configuration"
   },
   "d1_databases": [
     {

@@ -218,7 +218,7 @@ remoteRoutes.post("/sftp/auth", async (c) => {
     return c.json({ error: "Invalid credentials" }, 403);
   }
 
-  const [username, serverUuid] = parts;
+  const [username, _serverUuid] = parts;
   if (!username) {
     return c.json({ error: "Invalid credentials" }, 403);
   }
@@ -233,31 +233,8 @@ remoteRoutes.post("/sftp/auth", async (c) => {
     return c.json({ error: "Invalid credentials" }, 403);
   }
 
-  const { verifyPassword } = await import("../lib/auth");
-  const valid = await verifyPassword(body.password, user.passwordHash);
-  if (!valid) {
-    return c.json({ error: "Invalid credentials" }, 403);
-  }
-
-  if (!serverUuid) {
-    return c.json({ error: "Invalid credentials" }, 403);
-  }
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(eq(schema.servers.uuid, serverUuid))
-    .get();
-  if (!server) {
-    return c.json({ error: "Invalid credentials" }, 403);
-  }
-
-  if (user.role !== "admin" && server.ownerId !== user.id) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
-
-  return c.json({
-    server: server.uuid,
-    user: user.id,
-    permissions: ["*"],
-  });
+  // TODO: SFTP auth needs an API-key or token-based mechanism now that
+  // passwords are removed (OIDC-only auth). For now, reject all SFTP
+  // password attempts.
+  return c.json({ error: "SFTP password auth is disabled — use OIDC" }, 403);
 });

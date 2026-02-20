@@ -1,3 +1,20 @@
+CREATE TABLE `accounts` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`account_id` text NOT NULL,
+	`provider_id` text NOT NULL,
+	`access_token` text,
+	`refresh_token` text,
+	`access_token_expires_at` text,
+	`refresh_token_expires_at` text,
+	`scope` text,
+	`id_token` text,
+	`password` text,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `activity_logs` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text,
@@ -43,8 +60,10 @@ CREATE INDEX `idx_egg_variables_egg` ON `egg_variables` (`egg_id`);--> statement
 CREATE TABLE `eggs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
+	`author` text DEFAULT '',
 	`description` text DEFAULT '',
 	`docker_image` text DEFAULT '' NOT NULL,
+	`docker_images` text DEFAULT '{}',
 	`startup` text DEFAULT '' NOT NULL,
 	`stop_command` text DEFAULT 'stop' NOT NULL,
 	`stop_signal` text DEFAULT 'SIGTERM' NOT NULL,
@@ -56,6 +75,7 @@ CREATE TABLE `eggs` (
 	`script_entry` text DEFAULT 'bash',
 	`file_denylist` text DEFAULT '[]',
 	`features` text DEFAULT '{}',
+	`tags` text DEFAULT '[]',
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL
 );
@@ -70,6 +90,7 @@ CREATE TABLE `nodes` (
 	`memory_overallocate` integer DEFAULT 0 NOT NULL,
 	`disk` integer DEFAULT 0 NOT NULL,
 	`disk_overallocate` integer DEFAULT 0 NOT NULL,
+	`cpu_threads` integer DEFAULT 0 NOT NULL,
 	`upload_size` integer DEFAULT 100 NOT NULL,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL
@@ -118,6 +139,19 @@ CREATE TABLE `servers` (
 CREATE UNIQUE INDEX `servers_uuid_unique` ON `servers` (`uuid`);--> statement-breakpoint
 CREATE INDEX `idx_servers_node` ON `servers` (`node_id`);--> statement-breakpoint
 CREATE INDEX `idx_servers_owner` ON `servers` (`owner_id`);--> statement-breakpoint
+CREATE TABLE `sessions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`token` text NOT NULL,
+	`expires_at` text NOT NULL,
+	`ip_address` text,
+	`user_agent` text,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `sessions_token_unique` ON `sessions` (`token`);--> statement-breakpoint
 CREATE TABLE `subusers` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -131,13 +165,22 @@ CREATE TABLE `subusers` (
 CREATE UNIQUE INDEX `idx_su_unique` ON `subusers` (`user_id`,`server_id`);--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
+	`name` text DEFAULT '' NOT NULL,
 	`email` text NOT NULL,
-	`username` text NOT NULL,
-	`password_hash` text NOT NULL,
+	`email_verified` integer DEFAULT false NOT NULL,
+	`image` text,
 	`role` text DEFAULT 'user' NOT NULL,
+	`username` text DEFAULT '' NOT NULL,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);--> statement-breakpoint
-CREATE UNIQUE INDEX `users_username_unique` ON `users` (`username`);
+CREATE TABLE `verifications` (
+	`id` text PRIMARY KEY NOT NULL,
+	`identifier` text NOT NULL,
+	`value` text NOT NULL,
+	`expires_at` text NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL
+);

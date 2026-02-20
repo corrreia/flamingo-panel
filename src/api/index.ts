@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
+import { generateApiKey } from "../services/api-keys";
 import { applicationRoutes } from "./application";
 import { authRoutes } from "./auth";
 import { eggRoutes } from "./eggs";
@@ -116,4 +117,20 @@ apiRoutes.get("/users", requireAuth, requireAdmin, async (c) => {
     .from(schema.users)
     .all();
   return c.json(users);
+});
+
+// POST /api/api-keys — create an application API key (admin only)
+apiRoutes.post("/api-keys", requireAuth, requireAdmin, async (c) => {
+  const user = c.get("user" as never) as { id: string };
+  const body = (await c.req.json()) as { memo?: string };
+  const db = getDb(c.env.DB);
+
+  const { token, identifier } = await generateApiKey(
+    db,
+    user.id,
+    body.memo || "Wings configure token"
+  );
+
+  // Return the raw token — this is the ONLY time it's shown
+  return c.json({ token, identifier }, 201);
 });
