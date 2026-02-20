@@ -1,21 +1,20 @@
 import { createMiddleware } from "hono/factory";
-import type { Env } from "../../env";
 import { getSession, type Session } from "../../lib/auth";
 
-export type AuthUser = {
-  id: string;
+export interface AuthUser {
   email: string;
+  id: string;
   role: "admin" | "user";
-};
+}
 
-type AuthEnv = {
+interface AuthEnv {
   Bindings: Env;
   Variables: {
     session: Session;
     sessionId: string;
     user: AuthUser;
   };
-};
+}
 
 // Middleware that requires a valid session
 export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {

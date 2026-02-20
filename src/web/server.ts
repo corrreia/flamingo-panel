@@ -1,12 +1,11 @@
+import { env } from "cloudflare:workers";
 import {
   createStartHandler,
   defaultStreamHandler,
 } from "@tanstack/react-start/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env } from "../env";
 import { apiRoutes } from "../api";
-import { env } from "cloudflare:workers";
 
 // Hono API app — handles /api/* routes
 const api = new Hono<{ Bindings: Env }>();
@@ -17,7 +16,7 @@ api.route("/api", apiRoutes);
 const startHandler = createStartHandler(defaultStreamHandler);
 
 export default {
-  async fetch(request: Request): Promise<Response> {
+  fetch(request: Request): Response | Promise<Response> {
     const url = new URL(request.url);
 
     // Route /api/* to Hono

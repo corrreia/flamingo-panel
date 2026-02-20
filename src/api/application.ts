@@ -1,6 +1,5 @@
-import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import type { Env } from "../env";
+import { Hono } from "hono";
 import { getDb, schema } from "../db";
 
 export const applicationRoutes = new Hono<{ Bindings: Env }>();
@@ -16,23 +15,36 @@ applicationRoutes.use("*", async (c, next) => {
   const db = getDb(c.env.DB);
 
   // Hash the token and look up
-  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const hashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(token)
+  );
   const tokenHash = Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, "0")).join("");
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 
-  const key = await db.select().from(schema.apiKeys)
-    .where(eq(schema.apiKeys.tokenHash, tokenHash)).get();
-  if (!key) return c.json({ error: "Invalid API token" }, 401);
+  const key = await db
+    .select()
+    .from(schema.apiKeys)
+    .where(eq(schema.apiKeys.tokenHash, tokenHash))
+    .get();
+  if (!key) {
+    return c.json({ error: "Invalid API token" }, 401);
+  }
 
   // Verify the user is an admin
-  const user = await db.select().from(schema.users)
-    .where(eq(schema.users.id, key.userId)).get();
+  const user = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, key.userId))
+    .get();
   if (!user || user.role !== "admin") {
     return c.json({ error: "Admin access required" }, 403);
   }
 
   // Update last used
-  await db.update(schema.apiKeys)
+  await db
+    .update(schema.apiKeys)
     .set({ lastUsedAt: new Date().toISOString() })
     .where(eq(schema.apiKeys.id, key.id));
 
@@ -47,9 +59,14 @@ applicationRoutes.use("*", async (c, next) => {
 // This is what `wings configure` calls to get the full config.yml JSON
 applicationRoutes.get("/nodes/:id/configuration", async (c) => {
   const db = getDb(c.env.DB);
-  const node = await db.select().from(schema.nodes)
-    .where(eq(schema.nodes.id, Number(c.req.param("id")))).get();
-  if (!node) return c.json({ error: "Node not found" }, 404);
+  const node = await db
+    .select()
+    .from(schema.nodes)
+    .where(eq(schema.nodes.id, Number(c.req.param("id"))))
+    .get();
+  if (!node) {
+    return c.json({ error: "Node not found" }, 404);
+  }
 
   // If this was a one-time configure key, consume it (delete after use)
   const memo = c.get("apiKeyMemo" as never) as string;
