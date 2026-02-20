@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "../db";
 import { type SystemInfo, WingsClient } from "../lib/wings-client";
 import { generateApiKey } from "../services/api-keys";
+import { logActivity } from "../lib/activity";
 import { requireAdmin, requireAuth } from "./middleware/auth";
 
 export const nodeRoutes = new Hono<{ Bindings: Env }>();
@@ -91,6 +92,8 @@ nodeRoutes.post(
       `node-configure:${node.id}`
     );
 
+    logActivity(c, { event: "node:create", nodeId: node.id, metadata: { name: data.name } });
+
     return c.json(
       {
         ...node,
@@ -127,6 +130,7 @@ nodeRoutes.put(
     if (!node) {
       return c.json({ error: "Node not found" }, 404);
     }
+    logActivity(c, { event: "node:update", nodeId: node.id, metadata: { name: node.name } });
     return c.json(node);
   }
 );
@@ -149,6 +153,8 @@ nodeRoutes.post("/:id/reconfigure", requireAdmin, async (c) => {
     user.id,
     `node-configure:${node.id}`
   );
+
+  logActivity(c, { event: "node:reconfigure", nodeId: node.id });
 
   return c.json({
     configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id} && systemctl restart wings`,
@@ -196,6 +202,8 @@ nodeRoutes.delete("/:id", requireAdmin, async (c) => {
   if (servers.length > 0) {
     return c.json({ error: "Cannot delete node with active servers" }, 409);
   }
+  const nodeToDelete = await db.select({ name: schema.nodes.name }).from(schema.nodes).where(eq(schema.nodes.id, nodeId)).get();
+  logActivity(c, { event: "node:delete", nodeId, metadata: { name: nodeToDelete?.name } });
   await db.delete(schema.nodes).where(eq(schema.nodes.id, nodeId));
   return c.body(null, 204);
 });
