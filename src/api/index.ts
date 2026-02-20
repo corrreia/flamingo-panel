@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
+import { logActivity } from "../lib/activity";
 import { generateApiKey } from "../services/api-keys";
 import { activityRoutes } from "./activity";
 import { applicationRoutes } from "./application";
@@ -132,6 +133,8 @@ apiRoutes.post("/api-keys", requireAuth, requireAdmin, async (c) => {
     user.id,
     body.memo || "Wings configure token"
   );
+
+  logActivity(c, { event: "api-key:create", metadata: { memo: body.memo } });
 
   // Return the raw token — this is the ONLY time it's shown
   return c.json({ token, identifier }, 201);
