@@ -27,12 +27,12 @@ activityRoutes.get("/", requireAdmin, async (c) => {
   const filterTo = c.req.query("to");
 
   const conditions = [];
-  if (filterServer) conditions.push(eq(schema.activityLogs.serverId, filterServer));
-  if (filterNode) conditions.push(eq(schema.activityLogs.nodeId, Number(filterNode)));
-  if (filterUser) conditions.push(eq(schema.activityLogs.userId, filterUser));
-  if (filterEvent) conditions.push(eq(schema.activityLogs.event, filterEvent));
-  if (filterFrom) conditions.push(gte(schema.activityLogs.createdAt, filterFrom));
-  if (filterTo) conditions.push(lte(schema.activityLogs.createdAt, filterTo));
+  if (filterServer) { conditions.push(eq(schema.activityLogs.serverId, filterServer)); }
+  if (filterNode) { conditions.push(eq(schema.activityLogs.nodeId, Number(filterNode))); }
+  if (filterUser) { conditions.push(eq(schema.activityLogs.userId, filterUser)); }
+  if (filterEvent) { conditions.push(eq(schema.activityLogs.event, filterEvent)); }
+  if (filterFrom) { conditions.push(gte(schema.activityLogs.createdAt, filterFrom)); }
+  if (filterTo) { conditions.push(lte(schema.activityLogs.createdAt, filterTo)); }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -88,7 +88,7 @@ activityRoutes.get("/server/:serverId", async (c) => {
     .from(schema.servers)
     .where(eq(schema.servers.id, serverId))
     .get();
-  if (!server) return c.json({ error: "Server not found" }, 404);
+  if (!server) { return c.json({ error: "Server not found" }, 404); }
   if (user.role !== "admin" && server.ownerId !== user.id) {
     return c.json({ error: "Forbidden" }, 403);
   }
@@ -99,7 +99,7 @@ activityRoutes.get("/server/:serverId", async (c) => {
 
   const filterEvent = c.req.query("event");
   const conditions = [eq(schema.activityLogs.serverId, serverId)];
-  if (filterEvent) conditions.push(eq(schema.activityLogs.event, filterEvent));
+  if (filterEvent) { conditions.push(eq(schema.activityLogs.event, filterEvent)); }
 
   const where = and(...conditions);
 

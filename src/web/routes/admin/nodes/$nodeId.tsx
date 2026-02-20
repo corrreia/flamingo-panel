@@ -18,8 +18,6 @@ import { Button } from "@web/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@web/components/ui/card";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
@@ -298,7 +296,7 @@ function NodeDetailPage() {
 
           <TabsContent value="overview">
             <Card>
-              <CardContent className="pt-6 space-y-6">
+              <CardContent className="space-y-6 pt-6">
                 {node.stats ? (
                   <div className="grid grid-cols-1 gap-x-12 gap-y-0 sm:grid-cols-2">
                     <div className="divide-y">
@@ -367,7 +365,7 @@ function NodeDetailPage() {
 
           <TabsContent value="settings">
             <Card>
-              <CardContent className="pt-6 space-y-6">
+              <CardContent className="space-y-6 pt-6">
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-2">

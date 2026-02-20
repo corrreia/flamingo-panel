@@ -19,7 +19,7 @@ const dateText = customType<{ data: string; driverData: string }>({
     return "text";
   },
   toDriver(value): string {
-    if (value instanceof Date) return value.toISOString();
+    if (value instanceof Date) { return value.toISOString(); }
     return String(value);
   },
 });

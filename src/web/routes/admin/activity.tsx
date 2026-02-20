@@ -91,10 +91,10 @@ function ActivityLogPage() {
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("per_page", "50");
-  if (serverId) params.set("server_id", serverId);
-  if (nodeId) params.set("node_id", nodeId);
-  if (userId) params.set("user_id", userId);
-  if (event) params.set("event", event);
+  if (serverId) { params.set("server_id", serverId); }
+  if (nodeId) { params.set("node_id", nodeId); }
+  if (userId) { params.set("user_id", userId); }
+  if (event) { params.set("event", event); }
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-activity", page, serverId, nodeId, userId, event],

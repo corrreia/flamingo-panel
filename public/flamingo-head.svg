@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160" width="120" height="160">
+  <style>
+    @keyframes neckSway {
+      0%, 100% { transform: rotate(0deg); }
+      30% { transform: rotate(3deg); }
+      70% { transform: rotate(-3deg); }
+    }
+    @keyframes blink {
+      0%, 42%, 44%, 100% { transform: scaleY(1); }
+      43% { transform: scaleY(0.1); }
+    }
+    .neck-group {
+      animation: neckSway 4s ease-in-out infinite;
+      transform-origin: 60px 140px;
+    }
+    .eye-group {
+      animation: blink 4s ease-in-out infinite;
+      transform-origin: 62px 62px;
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="flamingoNeck" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF8AB5"/>
+      <stop offset="100%" stop-color="#FF4081"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="#FFE0EC" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#FFE0EC" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background glow -->
+  <circle cx="60" cy="65" r="55" fill="url(#glow)"/>
+
+  <g class="neck-group">
+    <!-- Neck -->
+    <path d="M60 150 Q50 120 55 95 Q60 75 65 70" stroke="url(#flamingoNeck)" stroke-width="16" fill="none" stroke-linecap="round"/>
+
+    <!-- Head -->
+    <ellipse cx="68" cy="60" rx="24" ry="20" fill="#FF8AB5"/>
+
+    <!-- Beak -->
+    <path d="M48 63 L20 72 Q17 67 20 62 L48 58 Z" fill="#1A1A2E"/>
+    <path d="M48 60 L25 67" stroke="#FF8AB5" stroke-width="0.5" opacity="0.3"/>
+    <line x1="48" y1="60" x2="22" y2="67" stroke="#2D2D44" stroke-width="0.5"/>
+
+    <!-- Eye -->
+    <g class="eye-group">
+      <circle cx="60" cy="56" r="5.5" fill="white"/>
+      <circle cx="59" cy="56" r="3.2" fill="#1A1A2E"/>
+      <circle cx="58" cy="55" r="1.1" fill="white"/>
+    </g>
+
+    <!-- Blush -->
+    <circle cx="52" cy="66" r="6" fill="#FF4081" opacity="0.35"/>
+
+    <!-- Head highlight -->
+    <ellipse cx="72" cy="54" rx="8" ry="6" fill="white" opacity="0.15"/>
+  </g>
+</svg>

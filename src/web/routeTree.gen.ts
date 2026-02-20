@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServerServerIdRouteImport } from './routes/server/$serverId'
 import { Route as AdminCreateServerRouteImport } from './routes/admin/create-server'
+import { Route as AdminActivityRouteImport } from './routes/admin/activity'
 import { Route as AdminNodesIndexRouteImport } from './routes/admin/nodes/index'
 import { Route as AdminEggsIndexRouteImport } from './routes/admin/eggs/index'
 import { Route as AdminNodesNodeIdRouteImport } from './routes/admin/nodes/$nodeId'
@@ -37,6 +38,11 @@ const ServerServerIdRoute = ServerServerIdRouteImport.update({
 const AdminCreateServerRoute = AdminCreateServerRouteImport.update({
   id: '/admin/create-server',
   path: '/admin/create-server',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/admin/activity',
+  path: '/admin/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminNodesIndexRoute = AdminNodesIndexRouteImport.update({
@@ -68,6 +74,7 @@ const AdminEggsEggIdRoute = AdminEggsEggIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
   '/server/$serverId': typeof ServerServerIdRoute
   '/admin/eggs/$eggId': typeof AdminEggsEggIdRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
   '/server/$serverId': typeof ServerServerIdRoute
   '/admin/eggs/$eggId': typeof AdminEggsEggIdRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
   '/server/$serverId': typeof ServerServerIdRoute
   '/admin/eggs/$eggId': typeof AdminEggsEggIdRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/admin/activity'
     | '/admin/create-server'
     | '/server/$serverId'
     | '/admin/eggs/$eggId'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/admin/activity'
     | '/admin/create-server'
     | '/server/$serverId'
     | '/admin/eggs/$eggId'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/login'
+    | '/admin/activity'
     | '/admin/create-server'
     | '/server/$serverId'
     | '/admin/eggs/$eggId'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  AdminActivityRoute: typeof AdminActivityRoute
   AdminCreateServerRoute: typeof AdminCreateServerRoute
   ServerServerIdRoute: typeof ServerServerIdRoute
   AdminEggsEggIdRoute: typeof AdminEggsEggIdRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/create-server'
       fullPath: '/admin/create-server'
       preLoaderRoute: typeof AdminCreateServerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/admin/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/nodes/': {
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  AdminActivityRoute: AdminActivityRoute,
   AdminCreateServerRoute: AdminCreateServerRoute,
   ServerServerIdRoute: ServerServerIdRoute,
   AdminEggsEggIdRoute: AdminEggsEggIdRoute,
