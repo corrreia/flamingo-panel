@@ -2,17 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@web/components/ui/alert-dialog";
 import { Button } from "@web/components/ui/button";
 import { Card, CardContent } from "@web/components/ui/card";
 import {
@@ -36,7 +25,7 @@ import {
   TableRow,
 } from "@web/components/ui/table";
 import { api } from "@web/lib/api";
-import { ArrowLeft, Check, Copy, Network, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Copy, Network, Plus } from "lucide-react";
 import { useState } from "react";
 
 interface NodeItem {
@@ -52,11 +41,7 @@ interface CreatedNode extends NodeItem {
   configureCommand: string;
 }
 
-function renderNodesList(
-  nodes: NodeItem[] | undefined,
-  isLoading: boolean,
-  deleteMutation: { isPending: boolean; mutate: (id: number) => void }
-) {
+function renderNodesList(nodes: NodeItem[] | undefined, isLoading: boolean) {
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -78,7 +63,6 @@ function renderNodesList(
               <TableHead>Wings URL</TableHead>
               <TableHead className="text-right">Memory</TableHead>
               <TableHead className="text-right">Disk</TableHead>
-              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -120,42 +104,6 @@ function renderNodesList(
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {node.disk > 0 ? `${node.disk} MB` : "-"}
-                </TableCell>
-                <TableCell>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        className="text-destructive hover:text-destructive"
-                        size="sm"
-                        variant="ghost"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Delete node "{node.name}"?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently remove this node. This action
-                          cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          disabled={deleteMutation.isPending}
-                          onClick={() => deleteMutation.mutate(node.id)}
-                        >
-                          {deleteMutation.isPending
-                            ? "Deleting..."
-                            : "Delete Node"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </TableCell>
               </TableRow>
             ))}
@@ -215,11 +163,6 @@ function NodesPage() {
       queryClient.invalidateQueries({ queryKey: ["nodes"] });
     },
     onError: (err: Error) => setError(err.message),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/nodes/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["nodes"] }),
   });
 
   const handleCreate = (e: React.FormEvent) => {
@@ -357,7 +300,7 @@ function NodesPage() {
           </DialogContent>
         </Dialog>
 
-        {renderNodesList(nodes, isLoading, deleteMutation)}
+        {renderNodesList(nodes, isLoading)}
       </div>
     </Layout>
   );

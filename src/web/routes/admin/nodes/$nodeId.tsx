@@ -1,7 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@web/components/ui/alert-dialog";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import {
@@ -25,6 +36,7 @@ import {
   Save,
   Server,
   Terminal,
+  Trash2,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -70,6 +82,7 @@ export const Route = createFileRoute("/admin/nodes/$nodeId")({
 
 function NodeDetailPage() {
   const { nodeId } = Route.useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -106,6 +119,14 @@ function NodeDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["node", nodeId] });
     },
     onError: (err: Error) => setError(err.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/nodes/${nodeId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["nodes"] });
+      navigate({ to: "/admin/nodes" });
+    },
   });
 
   const reconfigureMutation = useMutation({
@@ -159,9 +180,10 @@ function NodeDetailPage() {
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
-            <h1 className="font-bold text-2xl">
-              Node #{node.id} — {node.name}
-            </h1>
+            <div>
+              <h1 className="font-bold text-2xl">{node.name}</h1>
+              <p className="text-muted-foreground text-sm">Node #{node.id}</p>
+            </div>
             <Badge variant={node.stats ? "default" : "secondary"}>
               {node.stats ? (
                 <>
@@ -383,6 +405,49 @@ function NodeDetailPage() {
                   {saveMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-destructive lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Delete this node</p>
+                <p className="text-muted-foreground text-sm">
+                  All servers must be removed from this node before it can be
+                  deleted. This action cannot be undone.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Node
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete node "{node.name}"?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently remove this node. This action cannot
+                      be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => deleteMutation.mutate()}
+                    >
+                      {deleteMutation.isPending ? "Deleting..." : "Delete Node"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardContent>
           </Card>
         </div>
