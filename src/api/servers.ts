@@ -46,7 +46,7 @@ serverRoutes.post(
         .default(25_565),
       startup: z.string().optional(),
       image: z.string().optional(),
-      variables: z.record(z.string()).optional(),
+      variables: z.record(z.string(), z.string()).optional(),
     })
   ),
   async (c) => {

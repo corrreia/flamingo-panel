@@ -42,7 +42,7 @@ const createEggSchema = z.object({
   author: z.string().default(""),
   description: z.string().default(""),
   dockerImage: z.string().min(1),
-  dockerImages: z.record(z.string()).default({}),
+  dockerImages: z.record(z.string(), z.string()).default({}),
   startup: z.string().min(1),
   stopCommand: z.string().default("stop"),
   configStartup: z.string().default("{}"),
