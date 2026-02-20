@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
-import { StatCard } from "@web/components/stat-card";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   AlertDialog,
@@ -24,20 +23,27 @@ import {
 } from "@web/components/ui/card";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
+import { Separator } from "@web/components/ui/separator";
 import { Skeleton } from "@web/components/ui/skeleton";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@web/components/ui/tabs";
 import { useNodeMetrics } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
 import {
   ArrowLeft,
+  Box,
   Check,
   Copy,
   Cpu,
-  Globe,
   HardDrive,
   MemoryStick,
   Save,
-  Server,
+  Settings,
   Terminal,
   Trash2,
   Wifi,
@@ -73,6 +79,40 @@ interface NodeDetail {
   updatedAt: string;
   uploadSize: number;
   url: string;
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className="font-mono text-sm">{value}</span>
+    </div>
+  );
+}
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sub?: string;
+  value: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {icon}
+          <span className="text-xs">{label}</span>
+        </div>
+        <div className="mt-1 font-semibold text-lg tabular-nums">{value}</div>
+        {sub && <div className="text-muted-foreground text-xs">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
 }
 
 export const Route = createFileRoute("/admin/nodes/$nodeId")({
@@ -165,57 +205,40 @@ function NodeDetailPage() {
     );
   }
 
+  const isOnline = metrics.wingsOnline || !!node.stats;
+
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/admin/nodes">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div>
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/admin/nodes">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2.5">
               <h1 className="font-bold text-2xl">{node.name}</h1>
-              <p className="text-muted-foreground text-sm">Node #{node.id}</p>
+              <Badge variant={isOnline ? "default" : "secondary"}>
+                {isOnline ? (
+                  <>
+                    <Wifi className="mr-1 h-3 w-3" /> Online
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="mr-1 h-3 w-3" /> Offline
+                  </>
+                )}
+              </Badge>
             </div>
-            <Badge
-              variant={
-                metrics.wingsOnline || node.stats ? "default" : "secondary"
-              }
-            >
-              {metrics.wingsOnline || node.stats ? (
-                <>
-                  <Wifi className="mr-1 h-3 w-3" /> Online
-                </>
-              ) : (
-                <>
-                  <WifiOff className="mr-1 h-3 w-3" /> Offline
-                </>
-              )}
-            </Badge>
+            {node.url && (
+              <p className="truncate font-mono text-muted-foreground text-xs">
+                {node.url}
+              </p>
+            )}
           </div>
         </div>
-
-        {metrics.utilization && (
-          <div className="grid grid-cols-3 gap-4">
-            <StatCard
-              icon={<Cpu className="h-4 w-4" />}
-              label="CPU"
-              value={`${metrics.utilization.cpu_percent.toFixed(1)}%`}
-            />
-            <StatCard
-              icon={<MemoryStick className="h-4 w-4" />}
-              label="Memory"
-              value={`${formatBytes(metrics.utilization.memory_used)} / ${formatBytes(metrics.utilization.memory_total)}`}
-            />
-            <StatCard
-              icon={<HardDrive className="h-4 w-4" />}
-              label="Disk"
-              value={`${formatBytes(metrics.utilization.disk_used)} / ${formatBytes(metrics.utilization.disk_total)}`}
-            />
-          </div>
-        )}
 
         {error && (
           <Alert variant="destructive">
@@ -228,228 +251,253 @@ function NodeDetailPage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Server className="h-4 w-4" /> System Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const info = node.stats;
-                if (!info) {
-                  return (
-                    <p className="text-muted-foreground text-sm">
-                      {node.url
-                        ? "Could not connect to Wings."
-                        : "Set the Wings URL below to connect."}
-                    </p>
-                  );
-                }
-                return (
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Wings Version
-                      </span>
-                      <span className="font-mono">{info.version}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">OS</span>
-                      <span className="font-mono">{info.system.os}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Kernel</span>
-                      <span className="font-mono">
-                        {info.system.kernel_version}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Architecture
-                      </span>
-                      <span className="font-mono">
-                        {info.system.architecture}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">CPU Threads</span>
-                      <span className="flex items-center gap-1 font-mono">
-                        <Cpu className="h-3 w-3" /> {info.system.cpu_threads}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Memory</span>
-                      <span className="flex items-center gap-1 font-mono">
-                        <MemoryStick className="h-3 w-3" />{" "}
-                        {Math.round(
-                          info.system.memory_bytes / 1024 / 1024 / 1024
-                        )}{" "}
-                        GB
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Docker</span>
-                      <span className="font-mono">{info.docker.version}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Containers</span>
-                      <span className="font-mono">
-                        {info.docker.containers.running} running /{" "}
-                        {info.docker.containers.total} total
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Globe className="h-4 w-4" /> Connection
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Token ID</span>
-                <span className="font-mono text-xs">{node.tokenId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span>{new Date(node.createdAt).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Updated</span>
-                <span>{new Date(node.updatedAt).toLocaleString()}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-base">Node Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Name</Label>
-                  <Input
-                    id="edit-name"
-                    onChange={(e) => setName(e.target.value)}
-                    value={name}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-url">Wings URL</Label>
-                  <Input
-                    id="edit-url"
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://wings-node1.example.com"
-                    value={url}
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    Full URL with protocol.
-                  </p>
-                </div>
-              </div>
-              {configureCommand && (
-                <div className="space-y-2">
-                  <div className="select-all break-all rounded-md bg-muted p-3 font-mono text-xs">
-                    {configureCommand}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => copyToClipboard(configureCommand)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {commandCopied ? (
-                        <>
-                          <Check className="mr-2 h-4 w-4" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="mr-2 h-4 w-4" /> Copy Command
-                        </>
-                      )}
-                    </Button>
-                    <span className="text-muted-foreground text-xs">
-                      One-time use. Restart Wings after running.
-                    </span>
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <Button
-                  disabled={reconfigureMutation.isPending}
-                  onClick={() => reconfigureMutation.mutate()}
-                  variant="outline"
-                >
-                  <Terminal className="mr-2 h-4 w-4" />{" "}
-                  {reconfigureMutation.isPending
-                    ? "Generating..."
-                    : "Reconfigure Wings"}
-                </Button>
-                <Button
-                  disabled={saveMutation.isPending}
-                  onClick={() => {
-                    setError("");
-                    saveMutation.mutate();
-                  }}
-                >
-                  <Save className="mr-2 h-4 w-4" />{" "}
-                  {saveMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-destructive lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Delete this node</p>
-                <p className="text-muted-foreground text-sm">
-                  All servers must be removed from this node before it can be
-                  deleted. This action cannot be undone.
-                </p>
-              </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete Node
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Delete node "{node.name}"?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently remove this node. This action cannot
-                      be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      disabled={deleteMutation.isPending}
-                      onClick={() => deleteMutation.mutate()}
-                    >
-                      {deleteMutation.isPending ? "Deleting..." : "Delete Node"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardContent>
-          </Card>
+        {/* Live metrics — always visible */}
+        <div className="grid grid-cols-3 gap-4">
+          <MetricCard
+            icon={<Cpu className="h-4 w-4" />}
+            label="CPU"
+            sub={
+              node.stats
+                ? `${node.stats.system.cpu_threads} threads`
+                : undefined
+            }
+            value={
+              metrics.utilization
+                ? `${metrics.utilization.cpu_percent.toFixed(1)}%`
+                : "-"
+            }
+          />
+          <MetricCard
+            icon={<MemoryStick className="h-4 w-4" />}
+            label="Memory"
+            value={
+              metrics.utilization
+                ? `${formatBytes(metrics.utilization.memory_used)} / ${formatBytes(metrics.utilization.memory_total)}`
+                : "-"
+            }
+          />
+          <MetricCard
+            icon={<HardDrive className="h-4 w-4" />}
+            label="Disk"
+            value={
+              metrics.utilization
+                ? `${formatBytes(metrics.utilization.disk_used)} / ${formatBytes(metrics.utilization.disk_total)}`
+                : "-"
+            }
+          />
         </div>
+
+        {/* Tabs outside card, content inside */}
+        <Tabs defaultValue="overview">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="settings">
+              <Settings className="mr-1.5 h-3.5 w-3.5" /> Settings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <Card>
+              <CardContent className="pt-6 space-y-6">
+                {node.stats ? (
+                  <div className="grid grid-cols-1 gap-x-12 gap-y-0 sm:grid-cols-2">
+                    <div className="divide-y">
+                      <InfoRow label="OS" value={node.stats.system.os} />
+                      <InfoRow
+                        label="Kernel"
+                        value={node.stats.system.kernel_version}
+                      />
+                      <InfoRow
+                        label="Arch"
+                        value={node.stats.system.architecture}
+                      />
+                      <InfoRow
+                        label="CPU Threads"
+                        value={node.stats.system.cpu_threads}
+                      />
+                    </div>
+                    <div className="divide-y">
+                      <InfoRow
+                        label="Wings"
+                        value={`v${node.stats.version}`}
+                      />
+                      <InfoRow
+                        label="Docker"
+                        value={node.stats.docker.version}
+                      />
+                      <InfoRow
+                        label="Containers"
+                        value={
+                          <span className="flex items-center gap-1.5">
+                            <Box className="h-3 w-3 text-muted-foreground" />
+                            {node.stats.docker.containers.running} running /{" "}
+                            {node.stats.docker.containers.total} total
+                          </span>
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    {node.url
+                      ? "Could not connect to Wings."
+                      : "Set the Wings URL in Settings to connect."}
+                  </p>
+                )}
+
+                <Separator />
+
+                <div className="divide-y">
+                  <InfoRow
+                    label="Token ID"
+                    value={<span className="text-xs">{node.tokenId}</span>}
+                  />
+                  <InfoRow
+                    label="Created"
+                    value={new Date(node.createdAt).toLocaleString()}
+                  />
+                  <InfoRow
+                    label="Updated"
+                    value={new Date(node.updatedAt).toLocaleString()}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <Card>
+              <CardContent className="pt-6 space-y-6">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-name">Name</Label>
+                      <Input
+                        id="edit-name"
+                        onChange={(e) => setName(e.target.value)}
+                        value={name}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-url">Wings URL</Label>
+                      <Input
+                        id="edit-url"
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="https://wings-node1.example.com"
+                        value={url}
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        Full URL with protocol.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      disabled={saveMutation.isPending}
+                      onClick={() => {
+                        setError("");
+                        saveMutation.mutate();
+                      }}
+                    >
+                      <Save className="mr-2 h-4 w-4" />{" "}
+                      {saveMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="font-medium text-sm">Wings Setup</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Generate a one-time command to configure or reconfigure the
+                    Wings daemon on this node.
+                  </p>
+                  {configureCommand && (
+                    <div className="space-y-2">
+                      <div className="select-all break-all rounded-md bg-muted p-3 font-mono text-xs">
+                        {configureCommand}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => copyToClipboard(configureCommand)}
+                          size="sm"
+                          variant="outline"
+                        >
+                          {commandCopied ? (
+                            <>
+                              <Check className="mr-2 h-4 w-4" /> Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="mr-2 h-4 w-4" /> Copy Command
+                            </>
+                          )}
+                        </Button>
+                        <span className="text-muted-foreground text-xs">
+                          One-time use. Restart Wings after running.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    disabled={reconfigureMutation.isPending}
+                    onClick={() => reconfigureMutation.mutate()}
+                    variant="outline"
+                  >
+                    <Terminal className="mr-2 h-4 w-4" />{" "}
+                    {reconfigureMutation.isPending
+                      ? "Generating..."
+                      : "Generate Configure Command"}
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-destructive text-sm">
+                      Delete this node
+                    </h3>
+                    <p className="text-muted-foreground text-xs">
+                      All servers must be removed first. This cannot be undone.
+                    </p>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="destructive">
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Delete node &ldquo;{node.name}&rdquo;?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove this node. This action
+                          cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => deleteMutation.mutate()}
+                        >
+                          {deleteMutation.isPending
+                            ? "Deleting..."
+                            : "Delete Node"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
