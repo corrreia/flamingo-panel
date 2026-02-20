@@ -2,7 +2,8 @@ import type { Context } from "hono";
 import { getDb, schema } from "../db";
 
 export function logActivity(
-  c: Context<{ Bindings: Env }>,
+  // biome-ignore lint/suspicious/noExplicitAny: accepts any Hono context with Env bindings
+  c: Context<any>,
   opts: {
     event: string;
     serverId?: string | null;
