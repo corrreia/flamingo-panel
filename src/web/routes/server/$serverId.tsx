@@ -249,8 +249,15 @@ function PowerControls({
   );
 }
 
+interface ConsoleLine {
+  id: number;
+  text: string;
+}
+
+let nextLineId = 0;
+
 function ConsoleTab({ serverId }: { serverId: string }) {
-  const [lines, setLines] = useState<string[]>([]);
+  const [lines, setLines] = useState<ConsoleLine[]>([]);
   const [command, setCommand] = useState("");
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -276,13 +283,23 @@ function ConsoleTab({ serverId }: { serverId: string }) {
             if (msg.event === "auth success") {
               ws.send(JSON.stringify({ event: "send logs" }));
             } else if (msg.event === "console output") {
-              setLines((prev) => [...prev.slice(-500), ...msg.args]);
+              const newLines = (msg.args as string[]).map((text: string) => ({
+                id: nextLineId++,
+                text,
+              }));
+              setLines((prev) => [...prev.slice(-500), ...newLines]);
             } else if (msg.event === "status") {
-              setLines((prev) => [...prev, `[Status] ${msg.args[0]}`]);
+              setLines((prev) => [
+                ...prev,
+                { id: nextLineId++, text: `[Status] ${msg.args[0]}` },
+              ]);
             } else if (msg.event === "daemon error") {
               setLines((prev) => [
                 ...prev,
-                `[Error] ${msg.args?.[0] || "Connection lost"}`,
+                {
+                  id: nextLineId++,
+                  text: `[Error] ${msg.args?.[0] || "Connection lost"}`,
+                },
               ]);
             }
           } catch {
@@ -335,9 +352,9 @@ function ConsoleTab({ serverId }: { serverId: string }) {
           className="h-80 rounded-md border bg-zinc-950 p-3 font-mono text-xs"
           ref={scrollRef}
         >
-          {lines.map((line, i) => (
-            <div className="whitespace-pre-wrap text-zinc-300" key={`line-${i}`}>
-              {line}
+          {lines.map((line) => (
+            <div className="whitespace-pre-wrap text-zinc-300" key={line.id}>
+              {line.text}
             </div>
           ))}
           {lines.length === 0 && (
@@ -486,9 +503,9 @@ function FilesTab({ serverId }: { serverId: string }) {
   };
 
   const closeEditor = () => {
-    // biome-ignore lint/suspicious/noAlert: temporary until proper toast/dialog is implemented
     if (
       fileContent !== originalContent &&
+      // biome-ignore lint/suspicious/noAlert: temporary until proper toast/dialog is implemented
       !confirm("You have unsaved changes. Close anyway?")
     ) {
       return;
