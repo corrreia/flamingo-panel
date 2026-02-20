@@ -176,6 +176,9 @@ export const activityLogs = sqliteTable(
     serverId: text("server_id").references(() => servers.id, {
       onDelete: "cascade",
     }),
+    nodeId: integer("node_id").references(() => nodes.id, {
+      onDelete: "set null",
+    }),
     event: text("event").notNull(),
     metadata: text("metadata").default("{}"),
     ip: text("ip").default(""),
@@ -184,5 +187,8 @@ export const activityLogs = sqliteTable(
   (table) => [
     index("idx_activity_server").on(table.serverId),
     index("idx_activity_user").on(table.userId),
+    index("idx_activity_node").on(table.nodeId),
+    index("idx_activity_event").on(table.event),
+    index("idx_activity_created").on(table.createdAt),
   ]
 );
