@@ -39,6 +39,10 @@ Default to using Bun instead of Node.js.
 - `bun run dev` — Start dev server (Vite + Miniflare with all CF bindings)
 - `bun run build` — Production build (client + server bundles)
 - `bun run deploy` — Build + deploy to Cloudflare
+- `bun run test` — Run Vitest tests
+- `bun run lint` — Biome lint
+- `bun run format` — Biome auto-format
+- `bun run check` — Biome check with auto-fix
 
 ## Frontend Conventions
 
@@ -56,3 +60,8 @@ Default to using Bun instead of Node.js.
 - Auth middleware at `src/api/middleware/auth.ts`
 - Zod for request validation
 - Wings communication via `src/lib/wings-client.ts`
+
+## Code Quality
+
+- Use Biome for linting and formatting (not ESLint/Prettier)
+- Run `bun run check` before committing
