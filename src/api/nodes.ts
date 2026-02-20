@@ -24,9 +24,6 @@ nodeRoutes.get("/", requireAdmin, async (c) => {
       id: schema.nodes.id,
       name: schema.nodes.name,
       url: schema.nodes.url,
-      memory: schema.nodes.memory,
-      disk: schema.nodes.disk,
-      cpuThreads: schema.nodes.cpuThreads,
       createdAt: schema.nodes.createdAt,
     })
     .from(schema.nodes)
@@ -50,37 +47,8 @@ nodeRoutes.get("/:id", requireAdmin, async (c) => {
   if (node.url) {
     try {
       const client = new WingsClient(node);
-      const [sysInfo, utilization] = await Promise.all([
-        client.getSystemInfo(),
-        client.getSystemUtilization(),
-      ]);
+      const sysInfo = await client.getSystemInfo();
       stats = sysInfo;
-
-      // Sync detected hardware stats to DB (non-blocking)
-      const detectedMemory = Math.round(
-        sysInfo.system.memory_bytes / 1024 / 1024
-      );
-      const detectedDisk = Math.round(utilization.disk_total / 1024 / 1024);
-      const detectedCpu = sysInfo.system.cpu_threads;
-
-      if (
-        node.memory !== detectedMemory ||
-        node.disk !== detectedDisk ||
-        node.cpuThreads !== detectedCpu
-      ) {
-        c.executionCtx.waitUntil(
-          db
-            .update(schema.nodes)
-            .set({
-              memory: detectedMemory,
-              disk: detectedDisk,
-              cpuThreads: detectedCpu,
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(schema.nodes.id, node.id))
-            .run()
-        );
-      }
     } catch {
       // Node might be offline
     }
@@ -138,8 +106,6 @@ const updateNodeSchema = z
   .object({
     name: z.string().min(1).max(255),
     url: z.string(),
-    memoryOverallocate: z.number().int(),
-    diskOverallocate: z.number().int(),
   })
   .partial();
 
