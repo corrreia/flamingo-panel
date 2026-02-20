@@ -1,5 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@web/lib/api";
+import { Layout } from "@web/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@web/components/ui/card";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
@@ -46,92 +49,100 @@ interface FileEntry {
   mime: string;
 }
 
-export function ServerPage({ serverId }: { serverId: string }) {
-  const [server, setServer] = useState<ServerDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+export const Route = createFileRoute("/server/$serverId")({
+  component: ServerPage,
+});
 
-  useEffect(() => {
-    api.get<ServerDetail>(`/servers/${serverId}`)
-      .then(setServer)
-      .finally(() => setLoading(false));
-  }, [serverId]);
+function ServerPage() {
+  const { serverId } = Route.useParams();
 
-  if (loading) {
-    return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-64" /></div>;
+  const { data: server, isLoading } = useQuery({
+    queryKey: ["server", serverId],
+    queryFn: () => api.get<ServerDetail>(`/servers/${serverId}`),
+  });
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-64" />
+        </div>
+      </Layout>
+    );
   }
 
   if (!server) {
-    return <div className="text-muted-foreground">Server not found.</div>;
+    return (
+      <Layout>
+        <div className="text-muted-foreground">Server not found.</div>
+      </Layout>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <a href="/"><ArrowLeft className="h-4 w-4" /></a>
-          </Button>
-          <h1 className="text-2xl font-bold">{server.name}</h1>
-          <Badge variant={server.resources?.state === "running" ? "default" : "secondary"}>
-            {server.resources?.state || server.status || "offline"}
-          </Badge>
+    <Layout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/"><ArrowLeft className="h-4 w-4" /></Link>
+            </Button>
+            <h1 className="text-2xl font-bold">{server.name}</h1>
+            <Badge variant={server.resources?.state === "running" ? "default" : "secondary"}>
+              {server.resources?.state || server.status || "offline"}
+            </Badge>
+          </div>
+          <PowerControls serverId={server.id} state={server.resources?.state || "offline"} />
         </div>
-        <PowerControls serverId={server.id} state={server.resources?.state || "offline"} />
+
+        {server.resources?.utilization && (
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard icon={<Cpu className="h-4 w-4" />} label="CPU" value={`${server.resources.utilization.cpu_absolute.toFixed(1)}%`} />
+            <StatCard icon={<MemoryStick className="h-4 w-4" />} label="Memory" value={formatBytes(server.resources.utilization.memory_bytes)} />
+            <StatCard icon={<HardDrive className="h-4 w-4" />} label="Disk" value={formatBytes(server.resources.utilization.disk_bytes)} />
+            <StatCard icon={<Wifi className="h-4 w-4" />} label="Network" value={`${formatBytes(server.resources.utilization.network.rx_bytes)} / ${formatBytes(server.resources.utilization.network.tx_bytes)}`} />
+          </div>
+        )}
+
+        <Tabs defaultValue="console">
+          <TabsList>
+            <TabsTrigger value="console"><Terminal className="mr-2 h-4 w-4" /> Console</TabsTrigger>
+            <TabsTrigger value="files"><FolderOpen className="mr-2 h-4 w-4" /> Files</TabsTrigger>
+            <TabsTrigger value="settings"><Settings className="mr-2 h-4 w-4" /> Settings</TabsTrigger>
+          </TabsList>
+          <TabsContent value="console">
+            <ConsoleTab serverId={server.id} />
+          </TabsContent>
+          <TabsContent value="files">
+            <FilesTab serverId={server.id} />
+          </TabsContent>
+          <TabsContent value="settings">
+            <Card><CardContent className="py-8 text-center text-muted-foreground">Settings coming soon.</CardContent></Card>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {server.resources?.utilization && (
-        <div className="grid grid-cols-4 gap-4">
-          <StatCard icon={<Cpu className="h-4 w-4" />} label="CPU" value={`${server.resources.utilization.cpu_absolute.toFixed(1)}%`} />
-          <StatCard icon={<MemoryStick className="h-4 w-4" />} label="Memory" value={formatBytes(server.resources.utilization.memory_bytes)} />
-          <StatCard icon={<HardDrive className="h-4 w-4" />} label="Disk" value={formatBytes(server.resources.utilization.disk_bytes)} />
-          <StatCard icon={<Wifi className="h-4 w-4" />} label="Network" value={`${formatBytes(server.resources.utilization.network.rx_bytes)} / ${formatBytes(server.resources.utilization.network.tx_bytes)}`} />
-        </div>
-      )}
-
-      <Tabs defaultValue="console">
-        <TabsList>
-          <TabsTrigger value="console"><Terminal className="mr-2 h-4 w-4" /> Console</TabsTrigger>
-          <TabsTrigger value="files"><FolderOpen className="mr-2 h-4 w-4" /> Files</TabsTrigger>
-          <TabsTrigger value="settings"><Settings className="mr-2 h-4 w-4" /> Settings</TabsTrigger>
-        </TabsList>
-        <TabsContent value="console">
-          <ConsoleTab serverId={server.id} />
-        </TabsContent>
-        <TabsContent value="files">
-          <FilesTab serverId={server.id} />
-        </TabsContent>
-        <TabsContent value="settings">
-          <Card><CardContent className="py-8 text-center text-muted-foreground">Settings coming soon.</CardContent></Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+    </Layout>
   );
 }
 
 function PowerControls({ serverId, state }: { serverId: string; state: string }) {
-  const [acting, setActing] = useState(false);
-
-  const power = async (action: string) => {
-    setActing(true);
-    try {
-      await api.post(`/servers/${serverId}/power`, { action });
-    } finally {
-      setActing(false);
-    }
-  };
+  const powerMutation = useMutation({
+    mutationFn: (action: string) => api.post(`/servers/${serverId}/power`, { action }),
+  });
 
   return (
     <div className="flex gap-2">
-      <Button size="sm" variant="default" onClick={() => power("start")} disabled={acting || state === "running"}>
+      <Button size="sm" variant="default" onClick={() => powerMutation.mutate("start")} disabled={powerMutation.isPending || state === "running"}>
         <Play className="h-4 w-4 mr-1" /> Start
       </Button>
-      <Button size="sm" variant="secondary" onClick={() => power("restart")} disabled={acting || state === "offline"}>
+      <Button size="sm" variant="secondary" onClick={() => powerMutation.mutate("restart")} disabled={powerMutation.isPending || state === "offline"}>
         <RotateCcw className="h-4 w-4 mr-1" /> Restart
       </Button>
-      <Button size="sm" variant="secondary" onClick={() => power("stop")} disabled={acting || state === "offline"}>
+      <Button size="sm" variant="secondary" onClick={() => powerMutation.mutate("stop")} disabled={powerMutation.isPending || state === "offline"}>
         <Square className="h-4 w-4 mr-1" /> Stop
       </Button>
-      <Button size="sm" variant="destructive" onClick={() => power("kill")} disabled={acting || state === "offline"}>
+      <Button size="sm" variant="destructive" onClick={() => powerMutation.mutate("kill")} disabled={powerMutation.isPending || state === "offline"}>
         <Skull className="h-4 w-4 mr-1" /> Kill
       </Button>
     </div>
@@ -147,25 +158,18 @@ function ConsoleTab({ serverId }: { serverId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-
-    // Step 1: Get a console ticket (authenticated via session token)
     api.get<{ ticket: string }>(`/servers/${serverId}/console-ticket`).then(({ ticket }) => {
       if (cancelled) return;
-
-      // Step 2: Open WebSocket to the DO proxy via ticket
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(
         `${protocol}//${window.location.host}/api/servers/${serverId}/console?ticket=${ticket}`
       );
       wsRef.current = ws;
-
       ws.onopen = () => setConnected(true);
-
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
           if (msg.event === "auth success") {
-            // Wings auth confirmed through the DO relay
             ws.send(JSON.stringify({ event: "send logs" }));
           } else if (msg.event === "console output") {
             setLines((prev) => [...prev.slice(-500), ...msg.args]);
@@ -176,14 +180,9 @@ function ConsoleTab({ serverId }: { serverId: string }) {
           }
         } catch {}
       };
-
       ws.onclose = () => setConnected(false);
     });
-
-    return () => {
-      cancelled = true;
-      wsRef.current?.close();
-    };
+    return () => { cancelled = true; wsRef.current?.close(); };
   }, [serverId]);
 
   useEffect(() => {
@@ -215,13 +214,7 @@ function ConsoleTab({ serverId }: { serverId: string }) {
           {lines.length === 0 && <div className="text-zinc-600">Waiting for output...</div>}
         </ScrollArea>
         <form onSubmit={sendCommand} className="mt-2 flex gap-2">
-          <Input
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder="Type a command..."
-            className="font-mono text-sm"
-            disabled={!connected}
-          />
+          <Input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="Type a command..." className="font-mono text-sm" disabled={!connected} />
           <Button type="submit" disabled={!connected}>Send</Button>
         </form>
       </CardContent>
@@ -241,32 +234,48 @@ function isTextFile(name: string): boolean {
 }
 
 function FilesTab({ serverId }: { serverId: string }) {
-  const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentDir, setCurrentDir] = useState("/");
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: files, isLoading } = useQuery({
+    queryKey: ["server-files", serverId, currentDir],
+    queryFn: () => api.get<FileEntry[]>(`/servers/${serverId}/files/list?directory=${encodeURIComponent(currentDir)}`),
+  });
 
   // Editor state
   const [editingFile, setEditingFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"" | "saved" | "error">("");
 
-  const loadDir = useCallback((dir: string) => {
-    setLoading(true);
-    setCurrentDir(dir);
-    setEditingFile(null);
-    api.get<FileEntry[]>(`/servers/${serverId}/files/list?directory=${encodeURIComponent(dir)}`)
-      .then(setFiles)
-      .finally(() => setLoading(false));
-  }, [serverId]);
-
-  useEffect(() => { loadDir("/"); }, [loadDir]);
+  const saveMutation = useMutation({
+    mutationFn: async ({ file, content }: { file: string; content: string }) => {
+      const token = localStorage.getItem("session_token");
+      const res = await fetch(`/api/servers/${serverId}/files/write?file=${encodeURIComponent(file)}`, {
+        method: "POST",
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), "Content-Type": "text/plain" },
+        body: content,
+      });
+      if (!res.ok) throw new Error("Failed to save");
+    },
+    onSuccess: () => {
+      setOriginalContent(fileContent);
+      setSaveStatus("saved");
+      queryClient.invalidateQueries({ queryKey: ["server-files", serverId] });
+    },
+    onError: () => setSaveStatus("error"),
+  });
 
   const navigateUp = () => {
     const parent = currentDir.replace(/\/[^/]+\/?$/, "") || "/";
-    loadDir(parent);
+    setCurrentDir(parent);
+    setEditingFile(null);
+  };
+
+  const navigateDir = (dir: string) => {
+    setCurrentDir(dir);
+    setEditingFile(null);
   };
 
   const openFile = async (fileName: string) => {
@@ -290,30 +299,6 @@ function FilesTab({ serverId }: { serverId: string }) {
     }
   };
 
-  const saveFile = async () => {
-    if (!editingFile) return;
-    setSaving(true);
-    setSaveStatus("");
-    try {
-      const token = localStorage.getItem("session_token");
-      const res = await fetch(`/api/servers/${serverId}/files/write?file=${encodeURIComponent(editingFile)}`, {
-        method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Content-Type": "text/plain",
-        },
-        body: fileContent,
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      setOriginalContent(fileContent);
-      setSaveStatus("saved");
-    } catch {
-      setSaveStatus("error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const closeEditor = () => {
     if (fileContent !== originalContent) {
       if (!confirm("You have unsaved changes. Close anyway?")) return;
@@ -321,7 +306,6 @@ function FilesTab({ serverId }: { serverId: string }) {
     setEditingFile(null);
   };
 
-  // File editor view
   if (editingFile) {
     const fileName = editingFile.split("/").pop() || editingFile;
     return (
@@ -329,25 +313,16 @@ function FilesTab({ serverId }: { serverId: string }) {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={closeEditor}>
-                <X className="h-4 w-4" />
-              </Button>
+              <Button variant="ghost" size="sm" onClick={closeEditor}><X className="h-4 w-4" /></Button>
               <File className="h-4 w-4 text-muted-foreground" />
               <CardTitle className="text-base">{fileName}</CardTitle>
               <Badge variant="secondary" className="font-mono text-xs">{editingFile}</Badge>
-              {fileContent !== originalContent && (
-                <Badge variant="default" className="text-xs">Modified</Badge>
-              )}
-              {saveStatus === "saved" && (
-                <Badge variant="secondary" className="text-xs text-green-500">Saved</Badge>
-              )}
-              {saveStatus === "error" && (
-                <Badge variant="destructive" className="text-xs">Save failed</Badge>
-              )}
+              {fileContent !== originalContent && <Badge variant="default" className="text-xs">Modified</Badge>}
+              {saveStatus === "saved" && <Badge variant="secondary" className="text-xs text-green-500">Saved</Badge>}
+              {saveStatus === "error" && <Badge variant="destructive" className="text-xs">Save failed</Badge>}
             </div>
-            <Button size="sm" onClick={saveFile} disabled={saving || fileContent === originalContent}>
-              <Save className="h-4 w-4 mr-1" />
-              {saving ? "Saving..." : "Save"}
+            <Button size="sm" onClick={() => saveMutation.mutate({ file: editingFile, content: fileContent })} disabled={saveMutation.isPending || fileContent === originalContent}>
+              <Save className="h-4 w-4 mr-1" /> {saveMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </CardHeader>
@@ -381,7 +356,7 @@ function FilesTab({ serverId }: { serverId: string }) {
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10" />)}</div>
         ) : (
           <Table>
@@ -393,13 +368,13 @@ function FilesTab({ serverId }: { serverId: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {files.map((f) => (
+              {files?.map((f) => (
                 <TableRow
                   key={f.name}
                   className={f.directory || isTextFile(f.name) ? "cursor-pointer hover:bg-accent" : ""}
                   onClick={() => {
                     if (f.directory) {
-                      loadDir(currentDir === "/" ? `/${f.name}` : `${currentDir}/${f.name}`);
+                      navigateDir(currentDir === "/" ? `/${f.name}` : `${currentDir}/${f.name}`);
                     } else if (isTextFile(f.name)) {
                       openFile(f.name);
                     }
@@ -410,19 +385,13 @@ function FilesTab({ serverId }: { serverId: string }) {
                     {f.name}
                     {f.directory && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {f.directory ? "-" : formatBytes(f.size)}
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground text-xs">
-                    {new Date(f.modified).toLocaleString()}
-                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">{f.directory ? "-" : formatBytes(f.size)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground text-xs">{new Date(f.modified).toLocaleString()}</TableCell>
                 </TableRow>
               ))}
-              {files.length === 0 && (
+              {files?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                    Empty directory
-                  </TableCell>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">Empty directory</TableCell>
                 </TableRow>
               )}
             </TableBody>

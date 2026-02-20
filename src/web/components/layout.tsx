@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useAuth } from "@web/lib/auth";
 import { Button } from "@web/components/ui/button";
 import {
@@ -14,20 +15,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-foreground">
       <nav className="border-b border-border px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <a href="/" className="text-xl font-bold text-primary mr-4">Flamingo</a>
+          <Link to="/" className="text-xl font-bold text-primary mr-4">Flamingo</Link>
           <Button variant="ghost" size="sm" asChild>
-            <a href="/"><Server className="mr-2 h-4 w-4" /> Servers</a>
+            <Link to="/"><Server className="mr-2 h-4 w-4" /> Servers</Link>
           </Button>
           {user?.role === "admin" && (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <a href="/admin/nodes"><Network className="mr-2 h-4 w-4" /> Nodes</a>
+                <Link to="/admin/nodes"><Network className="mr-2 h-4 w-4" /> Nodes</Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
-                <a href="/admin/eggs"><Egg className="mr-2 h-4 w-4" /> Eggs</a>
+                <Link to="/admin/eggs"><Egg className="mr-2 h-4 w-4" /> Eggs</Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
-                <a href="/admin/create-server"><Plus className="mr-2 h-4 w-4" /> Create Server</a>
+                <Link to="/admin/create-server"><Plus className="mr-2 h-4 w-4" /> Create Server</Link>
               </Button>
             </>
           )}

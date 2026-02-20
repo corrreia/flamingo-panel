@@ -48,7 +48,7 @@ Pelican Panel requires a PHP server, MySQL database, Redis, and a reverse proxy.
 - **File Storage:** Cloudflare R2
 - **WebSocket Proxy:** Durable Objects
 - **API:** Hono + Zod
-- **Frontend:** React + Tailwind CSS + shadcn/ui
+- **Frontend:** TanStack Start (SSR) + TanStack Router + TanStack Query + React + Tailwind CSS + shadcn/ui
 - **ORM:** Drizzle
 
 ## Getting Started
@@ -74,8 +74,8 @@ Set `PANEL_URL` in `wrangler.jsonc` to the URL where your panel is reachable (e.
 
 | Command | Description |
 |---------|-------------|
-| `bun run dev` | Start local dev server |
-| `bun run build` | Build frontend |
+| `bun run dev` | Start local dev server (Vite + Miniflare with all CF bindings) |
+| `bun run build` | Build client + server bundles |
 | `bun run deploy` | Build + deploy to Cloudflare |
 | `bun run db:generate` | Generate migrations from schema |
 | `bun run db:migrate:dev` | Apply migrations locally |
