@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Avatar, AvatarFallback } from "@web/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@web/components/ui/avatar";
 import { Button } from "@web/components/ui/button";
 import {
   DropdownMenu,
@@ -50,6 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <DropdownMenuTrigger asChild>
             <Button className="relative h-8 w-8 rounded-full" variant="ghost">
               <Avatar className="h-8 w-8">
+                {user?.image && <AvatarImage alt={user.username} src={user.image} />}
                 <AvatarFallback className="bg-primary/20 text-primary">
                   {user?.username?.[0]?.toUpperCase() || "?"}
                 </AvatarFallback>
