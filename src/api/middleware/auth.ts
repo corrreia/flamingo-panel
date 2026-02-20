@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import { auth } from "../../lib/auth";
+import { createAuth } from "../../lib/auth";
 
 export interface AuthUser {
   email: string;
@@ -16,7 +16,7 @@ interface AuthEnv {
 
 // Middleware that requires a valid Better Auth session (cookie-based)
 export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
-  const session = await auth.api.getSession({
+  const session = await createAuth(c.env, c.req.url).api.getSession({
     headers: c.req.raw.headers,
   });
 
