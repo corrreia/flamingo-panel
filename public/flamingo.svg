@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <style>
+    @keyframes bodyBob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes legStep {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(15deg); }
+      75% { transform: rotate(-15deg); }
+    }
+    @keyframes neckSway {
+      0%, 100% { transform: rotate(0deg); }
+      30% { transform: rotate(3deg); }
+      70% { transform: rotate(-3deg); }
+    }
+    @keyframes blink {
+      0%, 42%, 44%, 100% { transform: scaleY(1); }
+      43% { transform: scaleY(0.1); }
+    }
+    @keyframes wingFlutter {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-8deg); }
+    }
+    @keyframes waterRipple {
+      0% { r: 0; opacity: 0.6; }
+      100% { r: 40; opacity: 0; }
+    }
+    @keyframes featherSway {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(5deg); }
+    }
+    .body-group {
+      animation: bodyBob 3s ease-in-out infinite;
+    }
+    .neck-group {
+      animation: neckSway 4s ease-in-out infinite;
+      transform-origin: 200px 220px;
+    }
+    .eye-group {
+      animation: blink 4s ease-in-out infinite;
+      transform-origin: 168px 112px;
+    }
+    .wing {
+      animation: wingFlutter 3s ease-in-out infinite;
+      transform-origin: 220px 240px;
+    }
+    .left-leg {
+      animation: legStep 3s ease-in-out infinite;
+      transform-origin: 190px 320px;
+    }
+    .right-leg {
+      animation: legStep 3s ease-in-out infinite 1.5s;
+      transform-origin: 210px 320px;
+    }
+    .tail-feather {
+      animation: featherSway 2.5s ease-in-out infinite;
+      transform-origin: 260px 250px;
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="flamingoBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B9D"/>
+      <stop offset="50%" stop-color="#FF4081"/>
+      <stop offset="100%" stop-color="#E91E63"/>
+    </linearGradient>
+    <linearGradient id="flamingoNeck" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF8AB5"/>
+      <stop offset="100%" stop-color="#FF4081"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4FC3F7"/>
+      <stop offset="50%" stop-color="#29B6F6"/>
+      <stop offset="100%" stop-color="#4FC3F7"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="#FFE0EC" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#FFE0EC" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background glow -->
+  <circle cx="200" cy="250" r="180" fill="url(#glow)"/>
+
+  <!-- Water surface -->
+  <ellipse cx="200" cy="440" rx="150" ry="20" fill="url(#water)" opacity="0.3"/>
+
+  <!-- Water ripples -->
+  <circle cx="190" cy="440" fill="none" stroke="#4FC3F7" stroke-width="1" opacity="0">
+    <animate attributeName="r" values="0;40" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="210" cy="440" fill="none" stroke="#4FC3F7" stroke-width="1" opacity="0">
+    <animate attributeName="r" values="0;35" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.4;0" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Left leg -->
+  <g class="left-leg">
+    <path d="M190 290 Q188 340 185 380 Q183 410 180 430" stroke="#FF6B9D" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M180 430 L170 440 M180 430 L185 442 M180 430 L178 443" stroke="#FF6B9D" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Right leg -->
+  <g class="right-leg">
+    <path d="M210 290 Q213 340 218 380 Q220 410 220 420 Q218 425 210 430" stroke="#FF6B9D" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M210 430 L200 440 M210 430 L215 442 M210 430 L208 443" stroke="#FF6B9D" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <g class="body-group">
+    <!-- Body -->
+    <ellipse cx="210" cy="270" rx="65" ry="55" fill="url(#flamingoBody)"/>
+
+    <!-- Wing -->
+    <g class="wing">
+      <path d="M220 240 Q270 230 280 260 Q275 280 240 290 Q220 295 210 280 Z" fill="#E91E63" opacity="0.7"/>
+      <path d="M235 250 Q265 245 270 265" stroke="#C2185B" stroke-width="1.5" fill="none" opacity="0.5"/>
+      <path d="M230 260 Q260 255 265 275" stroke="#C2185B" stroke-width="1.5" fill="none" opacity="0.5"/>
+    </g>
+
+    <!-- Tail feathers -->
+    <g class="tail-feather">
+      <path d="M260 250 Q290 240 300 245 Q295 255 270 260" fill="#E91E63" opacity="0.8"/>
+      <path d="M265 255 Q295 248 305 255 Q298 263 275 265" fill="#C2185B" opacity="0.6"/>
+      <path d="M260 260 Q288 258 295 265 Q285 272 265 268" fill="#AD1457" opacity="0.5"/>
+    </g>
+
+    <!-- Neck -->
+    <g class="neck-group">
+      <path d="M195 240 Q180 200 170 170 Q160 140 165 120" stroke="url(#flamingoNeck)" stroke-width="16" fill="none" stroke-linecap="round"/>
+
+      <!-- Head -->
+      <ellipse cx="168" cy="112" rx="22" ry="18" fill="#FF8AB5"/>
+
+      <!-- Beak -->
+      <path d="M150 115 L128 122 Q126 118 128 114 L150 110 Z" fill="#1A1A2E"/>
+      <path d="M150 112.5 L130 118" stroke="#FF8AB5" stroke-width="0.5" opacity="0.3"/>
+      <line x1="150" y1="112.5" x2="128" y2="118" stroke="#2D2D44" stroke-width="0.5"/>
+
+      <!-- Eye -->
+      <g class="eye-group">
+        <circle cx="160" cy="108" r="5" fill="white"/>
+        <circle cx="159" cy="108" r="3" fill="#1A1A2E"/>
+        <circle cx="158" cy="107" r="1" fill="white"/>
+      </g>
+
+      <!-- Blush -->
+      <circle cx="155" cy="116" r="5" fill="#FF4081" opacity="0.3"/>
+    </g>
+
+    <!-- Chest highlight -->
+    <ellipse cx="195" cy="260" rx="30" ry="35" fill="#FF8AB5" opacity="0.3"/>
+  </g>
+</svg>

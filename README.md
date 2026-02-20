@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/6/68/Lightmatter_flamingo2.jpg" width="300" />
+  <img src="public/flamingo.svg" width="200" />
 </p>
 
 <h1 align="center">Flamingo Panel</h1>
