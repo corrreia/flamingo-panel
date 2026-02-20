@@ -10,7 +10,7 @@ Browser ──→ Cloudflare Worker ──→ Wings Node(s)
                ├── D1 (database)
                ├── KV (sessions, tickets)
                ├── R2 (file storage)
-               └── Durable Objects (WebSocket proxy)
+               └── Durable Objects (WebSocket proxy, node metrics)
 ```
 
 **Users never talk to Wings directly.** All communication flows through the Worker:
@@ -48,44 +48,64 @@ Browser → Console:  WebSocket via Durable Object → Wings WebSocket
 
 ```
 src/
-├── env.ts                   # Environment type definitions
+├── env.d.ts                     # Environment type definitions
 ├── api/
-│   ├── index.ts             # API router
-│   ├── auth.ts              # Login, register, sessions, API keys
-│   ├── servers.ts           # Server CRUD, power, console, files
-│   ├── nodes.ts             # Node CRUD, Wings status checks
-│   ├── eggs.ts              # Egg import and management
-│   ├── files.ts             # File manager (proxies to Wings)
-│   ├── remote.ts            # Wings → Panel endpoints
-│   ├── application.ts       # Application API (wings configure)
-│   └── middleware/           # Auth middleware
+│   ├── index.ts                 # API router
+│   ├── auth.ts                  # Login, register, sessions, API keys
+│   ├── servers.ts               # Server CRUD, power, console, files
+│   ├── nodes.ts                 # Node CRUD, Wings status checks
+│   ├── eggs.ts                  # Egg import and management
+│   ├── files.ts                 # File manager (proxies to Wings)
+│   ├── remote.ts                # Wings → Panel endpoints
+│   ├── application.ts           # Application API (wings configure)
+│   ├── activity.ts              # Activity log endpoints
+│   └── middleware/              # Auth middleware
 ├── lib/
-│   ├── auth.ts              # Session management (KV-based)
-│   ├── wings-client.ts      # HTTP client for Panel → Wings
-│   ├── wings-jwt.ts         # JWT signing for WebSocket tokens
-│   └── rate-limit.ts        # KV-based rate limiting
+│   ├── auth.ts                  # Session management (KV-based)
+│   ├── wings-client.ts          # HTTP client for Panel → Wings
+│   ├── wings-jwt.ts             # JWT signing for WebSocket tokens
+│   ├── rate-limit.ts            # KV-based rate limiting
+│   ├── egg-import.ts            # Pelican egg JSON parser
+│   └── activity.ts              # Activity logging helpers
 ├── db/
-│   ├── schema.ts            # Drizzle schema (all tables)
-│   └── index.ts             # DB helper
+│   ├── schema.ts                # Drizzle schema (all tables)
+│   ├── auth-schema.ts           # Better Auth tables (users, sessions, accounts)
+│   └── index.ts                 # DB helper
 ├── durable-objects/
-│   └── console-session.ts   # WebSocket proxy to Wings console
+│   ├── console-session.ts       # WebSocket proxy to Wings console
+│   └── node-metrics.ts          # Node metrics streaming
+├── services/
+│   ├── api-keys.ts              # API key generation
+│   └── wings-payload.ts         # Wings server payload builder
 └── web/
-    ├── server.ts             # Worker entry — routes /api/* to Hono, /* to TanStack Start
-    ├── router.tsx            # TanStack Router config + QueryClient
-    ├── routeTree.gen.ts      # Auto-generated route tree (do not edit)
-    ├── index.css             # Tailwind CSS entry
-    ├── lib/                  # Frontend utilities (api client, auth context)
-    ├── components/           # shadcn/ui components + layout
+    ├── server.ts                # Worker entry — routes /api/* to Hono, /* to TanStack Start
+    ├── router.tsx               # TanStack Router config + QueryClient
+    ├── routeTree.gen.ts         # Auto-generated route tree (do not edit)
+    ├── index.css                # Tailwind CSS entry
+    ├── lib/
+    │   ├── api.ts               # Frontend API client
+    │   ├── auth.tsx             # Auth context + provider
+    │   ├── auth-client.ts       # Better Auth client
+    │   ├── format.ts            # Formatting utilities
+    │   └── utils.ts             # General utilities
+    ├── hooks/
+    │   └── use-node-metrics.ts  # Node metrics WebSocket hook
+    ├── components/
+    │   ├── ui/                  # shadcn/ui components
+    │   └── layout.tsx           # Main layout wrapper
     └── routes/
-        ├── __root.tsx            # Root route (HTML shell, providers)
-        ├── index.tsx             # Dashboard (server list)
-        ├── login.tsx             # Auth page
-        ├── server/$serverId.tsx  # Server detail (console, files, power)
+        ├── __root.tsx               # Root route (HTML shell, providers)
+        ├── index.tsx                # Dashboard (server list)
+        ├── login.tsx                # Auth page
+        ├── server/$serverId.tsx     # Server detail (console, files, power)
         └── admin/
-            ├── nodes/index.tsx   # Node list
-            ├── nodes/$nodeId.tsx # Node detail + settings
-            ├── eggs.tsx          # Egg management
-            └── create-server.tsx # Server creation wizard
+            ├── nodes/index.tsx      # Node list
+            ├── nodes/$nodeId.tsx    # Node detail + settings
+            ├── eggs/index.tsx       # Egg list
+            ├── eggs/$eggId.tsx      # Egg detail + variables
+            ├── eggs/create.tsx      # Egg creation
+            ├── create-server.tsx    # Server creation wizard
+            └── activity.tsx         # Activity log (admin)
 ```
 
 ## Frontend Architecture
