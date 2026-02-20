@@ -1,17 +1,22 @@
 import { api } from "@web/lib/api";
 import { useEffect, useRef, useState } from "react";
-import type { SystemInfo, SystemUtilization } from "../../lib/wings-client";
+
+export interface Utilization {
+  cpu_percent: number;
+  memory_used: number;
+  memory_total: number;
+  disk_used: number;
+  disk_total: number;
+}
 
 interface NodeMetricsState {
   connected: boolean;
   error: string | null;
-  systemInfo: SystemInfo | null;
-  utilization: SystemUtilization | null;
+  utilization: Utilization | null;
   wingsOnline: boolean;
 }
 
 const DEFAULT_STATE: NodeMetricsState = {
-  systemInfo: null,
   utilization: null,
   connected: false,
   error: null,
@@ -54,17 +59,10 @@ export function useNodeMetrics(
               event: string;
               data: unknown;
             };
-            if (msg.event === "system_info") {
+            if (msg.event === "utilization") {
               setState((prev) => ({
                 ...prev,
-                systemInfo: msg.data as SystemInfo,
-                wingsOnline: true,
-                error: null,
-              }));
-            } else if (msg.event === "utilization") {
-              setState((prev) => ({
-                ...prev,
-                utilization: msg.data as SystemUtilization,
+                utilization: msg.data as Utilization,
                 wingsOnline: true,
                 error: null,
               }));
