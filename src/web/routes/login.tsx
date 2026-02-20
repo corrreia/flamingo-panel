@@ -1,16 +1,32 @@
-import { useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { useAuth } from "@web/lib/auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@web/components/ui/card";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Alert, AlertDescription } from "@web/components/ui/alert";
+import { Button } from "@web/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@web/components/ui/card";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
-import { Button } from "@web/components/ui/button";
-import { Alert, AlertDescription } from "@web/components/ui/alert";
+import { useAuth } from "@web/lib/auth";
+import { useState } from "react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
+
+function getButtonLabel(isPending: boolean, isRegister: boolean): string {
+  if (isPending) {
+    return "Please wait...";
+  }
+  if (isRegister) {
+    return "Create Account";
+  }
+  return "Sign In";
+}
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -51,10 +67,10 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-primary">
+          <CardTitle className="font-bold text-2xl text-primary">
             Flamingo Panel
           </CardTitle>
           <CardDescription>
@@ -62,7 +78,7 @@ function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             {mutation.error && (
               <Alert variant="destructive">
                 <AlertDescription>{mutation.error.message}</AlertDescription>
@@ -72,11 +88,11 @@ function LoginPage() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
                 required
+                type="email"
+                value={email}
               />
             </div>
             {isRegister && (
@@ -84,10 +100,10 @@ function LoginPage() {
                 <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
-                  placeholder="username"
-                  value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  placeholder="username"
                   required
+                  value={username}
                 />
               </div>
             )}
@@ -95,34 +111,30 @@ function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
-                type="password"
-                placeholder="Min. 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
                 minLength={8}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min. 8 characters"
+                required
+                type="password"
+                value={password}
               />
             </div>
             <Button
-              type="submit"
               className="w-full"
               disabled={mutation.isPending}
+              type="submit"
             >
-              {mutation.isPending
-                ? "Please wait..."
-                : isRegister
-                  ? "Create Account"
-                  : "Sign In"}
+              {getButtonLabel(mutation.isPending, isRegister)}
             </Button>
             <Button
-              type="button"
-              variant="ghost"
               className="w-full"
               onClick={() => {
                 setIsRegister(!isRegister);
                 loginMutation.reset();
                 registerMutation.reset();
               }}
+              type="button"
+              variant="ghost"
             >
               {isRegister
                 ? "Already have an account? Sign in"

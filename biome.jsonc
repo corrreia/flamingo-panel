@@ -1,0 +1,108 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "root": true,
+  "extends": ["ultracite/biome/core", "ultracite/biome/react"],
+  "files": {
+    "includes": [
+      // Exclude generated / build artifacts
+      "!!**/routeTree.gen.ts",
+      "!!**/worker-configuration.d.ts",
+      "!!**/dist",
+      "!!**/.wrangler",
+      "!!**/node_modules",
+      "!!**/migrations"
+    ]
+  },
+  "javascript": {
+    // Cloudflare Workers globals not recognized by Biome
+    "globals": ["WebSocketPair"]
+  },
+  "linter": {
+    "rules": {
+      "suspicious": {
+        // Strict: no any anywhere
+        "noExplicitAny": "error",
+        "noImplicitAnyLet": "error",
+        // Allow console in API / server code (overridden below for web)
+        "noConsole": "off"
+      },
+      "correctness": {
+        // TanStack Router uses index routes and layout routes that re-export — keep unused imports clean
+        "noUnusedImports": {
+          "fix": "safe",
+          "level": "error"
+        },
+        "noUnusedVariables": "error"
+      },
+      "style": {
+        // Hono handlers and TanStack route files use default exports
+        "noDefaultExport": "off",
+        // File naming: kebab-case but allow route files like $serverId.tsx, __root.tsx
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "requireAscii": true,
+            "filenameCases": ["kebab-case", "camelCase"]
+          }
+        }
+      },
+      "performance": {
+        // Hono middleware chains and TanStack Query often use namespace-like patterns
+        "noBarrelFile": "off",
+        "noNamespaceImport": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      // TanStack Router route files use $ prefix and __ prefix conventions
+      "includes": ["src/web/routes/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      // API routes — allow console for server-side logging
+      "includes": [
+        "src/api/**",
+        "src/lib/**",
+        "src/durable-objects/**",
+        "src/web/server.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      // Config files
+      "includes": ["*.config.{js,ts,mjs,cjs,mts,cts}", "vite.config.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      // Type declaration files
+      "includes": ["**/*.d.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUndeclaredVariables": "off"
+          }
+        }
+      }
+    }
+  ]
+}

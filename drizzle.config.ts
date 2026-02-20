@@ -6,8 +6,9 @@ import { defineConfig } from "drizzle-kit";
 function findLocalD1Url(): string {
   const dir = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
   const file = readdirSync(dir).find((f) => f.endsWith(".sqlite"));
-  if (!file)
+  if (!file) {
     throw new Error("Local D1 not found — run `bun run dev` first.");
+  }
   return join(dir, file);
 }
 
@@ -24,9 +25,9 @@ export default defineConfig({
         // Production: apply migrations via D1 HTTP API
         driver: "d1-http",
         dbCredentials: {
-          accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
-          databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID!,
-          token: process.env.CLOUDFLARE_API_TOKEN!,
+          accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+          databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID ?? "",
+          token: process.env.CLOUDFLARE_API_TOKEN ?? "",
         },
       }),
 });

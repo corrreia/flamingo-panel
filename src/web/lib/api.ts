@@ -1,6 +1,10 @@
 const BASE = "/api";
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown
+): Promise<T> {
   const token = localStorage.getItem("session_token");
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -24,7 +28,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new Error(error.error || "Request failed");
   }
 
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) {
+    return undefined as T;
+  }
   return res.json();
 }
 

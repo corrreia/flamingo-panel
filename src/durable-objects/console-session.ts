@@ -1,10 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 
 interface ConnectParams {
-  wingsUrl: string;
-  wingsToken: string;
-  userId: string;
   serverId: string;
+  userId: string;
+  wingsToken: string;
+  wingsUrl: string;
 }
 
 export class ConsoleSession extends DurableObject {
@@ -14,6 +14,7 @@ export class ConsoleSession extends DurableObject {
 
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env);
+    // biome-ignore lint/suspicious/useAwait: blockConcurrencyWhile requires async callback
     ctx.blockConcurrencyWhile(async () => {
       ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS audit_log (
@@ -31,7 +32,7 @@ export class ConsoleSession extends DurableObject {
     const url = new URL(request.url);
 
     if (url.pathname === "/connect" && request.method === "POST") {
-      const params = await request.json() as ConnectParams;
+      const params = (await request.json()) as ConnectParams;
 
       // Accept the WebSocket from the client side of the pair
       const pair = new WebSocketPair();
@@ -47,13 +48,15 @@ export class ConsoleSession extends DurableObject {
 
       // Connect to Wings if not already connected
       if (!this.wingsSocket || this.wingsSocket.readyState !== WebSocket.OPEN) {
-        await this.connectToWings(params.wingsUrl, params.wingsToken);
+        this.connectToWings(params.wingsUrl, params.wingsToken);
       }
 
       // Log the connection
       this.ctx.storage.sql.exec(
         "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
-        params.userId, "console.connect", null,
+        params.userId,
+        "console.connect",
+        null
       );
 
       return new Response(null, { status: 101, webSocket: client });
@@ -62,9 +65,13 @@ export class ConsoleSession extends DurableObject {
     return new Response("Not found", { status: 404 });
   }
 
-  private async connectToWings(wingsUrl: string, wingsToken: string) {
+  private connectToWings(wingsUrl: string, wingsToken: string) {
     if (this.wingsSocket) {
-      try { this.wingsSocket.close(); } catch {}
+      try {
+        this.wingsSocket.close();
+      } catch {
+        // Ignore close errors on stale socket
+      }
       this.wingsSocket = null;
     }
 
@@ -89,15 +96,24 @@ export class ConsoleSession extends DurableObject {
           if (client.readyState === WebSocket.OPEN) {
             client.send(data);
           }
-        } catch {}
+        } catch {
+          // Client may have disconnected
+        }
       }
     });
 
     ws.addEventListener("close", () => {
       this.wingsSocket = null;
-      const msg = JSON.stringify({ event: "daemon error", args: ["Wings connection lost"] });
+      const msg = JSON.stringify({
+        event: "daemon error",
+        args: ["Wings connection lost"],
+      });
       for (const client of this.ctx.getWebSockets()) {
-        try { client.send(msg); } catch {}
+        try {
+          client.send(msg);
+        } catch {
+          // Client may have disconnected
+        }
       }
     });
 
@@ -109,7 +125,8 @@ export class ConsoleSession extends DurableObject {
   }
 
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
-    const data = typeof message === "string" ? message : new TextDecoder().decode(message);
+    const data =
+      typeof message === "string" ? message : new TextDecoder().decode(message);
 
     // Log commands to audit trail
     try {
@@ -119,10 +136,14 @@ export class ConsoleSession extends DurableObject {
         const userId = tags[0] || "unknown";
         this.ctx.storage.sql.exec(
           "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
-          userId, "console.command", parsed.args[0],
+          userId,
+          "console.command",
+          parsed.args[0]
         );
       }
-    } catch {}
+    } catch {
+      // Not valid JSON or not a command event — ignore
+    }
 
     // Relay to Wings
     if (this.wingsSocket?.readyState === WebSocket.OPEN) {
@@ -135,7 +156,9 @@ export class ConsoleSession extends DurableObject {
     const userId = tags[0] || "unknown";
     this.ctx.storage.sql.exec(
       "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
-      userId, "console.disconnect", null,
+      userId,
+      "console.disconnect",
+      null
     );
 
     // If no more clients, close Wings connection
@@ -146,7 +169,7 @@ export class ConsoleSession extends DurableObject {
     }
   }
 
-  webSocketError(ws: WebSocket) {
+  webSocketError(_ws: WebSocket) {
     const remaining = this.ctx.getWebSockets();
     if (remaining.length === 0 && this.wingsSocket) {
       this.wingsSocket.close();

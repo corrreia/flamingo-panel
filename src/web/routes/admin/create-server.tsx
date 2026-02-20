@@ -1,32 +1,75 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { api } from "@web/lib/api";
 import { Layout } from "@web/components/layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@web/components/ui/card";
+import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@web/components/ui/card";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@web/components/ui/select";
-import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Skeleton } from "@web/components/ui/skeleton";
-import { ArrowLeft, Server, ChevronRight } from "lucide-react";
+import { api } from "@web/lib/api";
+import { ArrowLeft, ChevronRight, Server } from "lucide-react";
+import { useEffect, useState } from "react";
 
-interface UserItem { id: string; email: string; username: string; role: string; }
-interface NodeItem { id: number; name: string; url: string; memory: number; disk: number; }
-interface EggItem { id: string; name: string; dockerImage: string; startup: string; }
-interface EggVariable {
-  id: string; name: string; description: string | null;
-  envVariable: string; defaultValue: string | null;
-  userViewable: number; userEditable: number; rules: string;
+interface UserItem {
+  email: string;
+  id: string;
+  role: string;
+  username: string;
 }
-interface EggDetail extends EggItem { variables: EggVariable[]; }
+interface NodeItem {
+  disk: number;
+  id: number;
+  memory: number;
+  name: string;
+  url: string;
+}
+interface EggItem {
+  dockerImage: string;
+  dockerImages: string;
+  id: string;
+  name: string;
+  startup: string;
+}
+interface EggVariable {
+  defaultValue: string | null;
+  description: string | null;
+  envVariable: string;
+  id: string;
+  name: string;
+  rules: string;
+  userEditable: number;
+  userViewable: number;
+}
+interface EggDetail extends EggItem {
+  variables: EggVariable[];
+}
 
 export const Route = createFileRoute("/admin/create-server")({
   component: CreateServerPage,
 });
+
+function getStepClassName(i: number, step: number): string {
+  if (i === step) {
+    return "bg-primary text-primary-foreground";
+  }
+  if (i < step) {
+    return "bg-primary/20 text-primary";
+  }
+  return "bg-muted text-muted-foreground";
+}
 
 function CreateServerPage() {
   const navigate = useNavigate();
@@ -43,11 +86,21 @@ function CreateServerPage() {
   const [cpu, setCpu] = useState("100");
   const [disk, setDisk] = useState("1024");
   const [port, setPort] = useState("25565");
+  const [selectedImage, setSelectedImage] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
 
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: () => api.get<UserItem[]>("/users") });
-  const { data: nodes } = useQuery({ queryKey: ["nodes"], queryFn: () => api.get<NodeItem[]>("/nodes") });
-  const { data: eggs } = useQuery({ queryKey: ["eggs"], queryFn: () => api.get<EggItem[]>("/eggs") });
+  const { data: users } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => api.get<UserItem[]>("/users"),
+  });
+  const { data: nodes } = useQuery({
+    queryKey: ["nodes"],
+    queryFn: () => api.get<NodeItem[]>("/nodes"),
+  });
+  const { data: eggs } = useQuery({
+    queryKey: ["eggs"],
+    queryFn: () => api.get<EggItem[]>("/eggs"),
+  });
 
   const { data: eggDetail } = useQuery({
     queryKey: ["egg", eggId],
@@ -55,17 +108,47 @@ function CreateServerPage() {
     enabled: !!eggId,
   });
 
-  const isLoading = !users || !nodes || !eggs;
+  const isLoading = !(users && nodes && eggs);
 
-  // Update variables when egg changes
+  // Update variables and docker image when egg changes
   useEffect(() => {
-    if (!eggDetail) return;
+    if (!eggDetail) {
+      return;
+    }
     const defaults: Record<string, string> = {};
     for (const v of eggDetail.variables) {
       defaults[v.envVariable] = v.defaultValue || "";
     }
     setVariables(defaults);
+
+    // Parse docker images and select the first one by default
+    try {
+      const parsed = JSON.parse(eggDetail.dockerImages || "{}") as Record<
+        string,
+        string
+      >;
+      const values = Object.values(parsed);
+      setSelectedImage(values.length > 0 ? values[0] : "");
+    } catch {
+      setSelectedImage("");
+    }
   }, [eggDetail]);
+
+  // Parse docker images map from egg detail
+  const dockerImagesMap: Record<string, string> | null = (() => {
+    if (!eggDetail?.dockerImages) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(eggDetail.dockerImages) as Record<
+        string,
+        string
+      >;
+      return Object.keys(parsed).length > 0 ? parsed : null;
+    } catch {
+      return null;
+    }
+  })();
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -73,12 +156,13 @@ function CreateServerPage() {
         name,
         description: description || undefined,
         ownerId,
-        nodeId: parseInt(nodeId),
+        nodeId: Number.parseInt(nodeId, 10),
         eggId,
-        memory: parseInt(memory),
-        cpu: parseInt(cpu),
-        disk: parseInt(disk),
-        defaultAllocationPort: parseInt(port),
+        memory: Number.parseInt(memory, 10),
+        cpu: Number.parseInt(cpu, 10),
+        disk: Number.parseInt(disk, 10),
+        defaultAllocationPort: Number.parseInt(port, 10),
+        image: selectedImage || undefined,
         variables,
       }),
     onSuccess: () => navigate({ to: "/" }),
@@ -86,7 +170,14 @@ function CreateServerPage() {
   });
 
   if (isLoading) {
-    return <Layout><div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-96" /></div></Layout>;
+    return (
+      <Layout>
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-96" />
+        </div>
+      </Layout>
+    );
   }
 
   const steps = [
@@ -101,23 +192,24 @@ function CreateServerPage() {
     <Layout>
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/"><ArrowLeft className="h-4 w-4" /></Link>
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
-          <h1 className="text-2xl font-bold">Create Server</h1>
+          <h1 className="font-bold text-2xl">Create Server</h1>
         </div>
 
         <div className="flex items-center gap-2">
           {steps.map((s, i) => (
-            <div key={i} className="flex items-center gap-2">
-              {i > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            <div className="flex items-center gap-2" key={s.label}>
+              {i > 0 && (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
               <button
+                className={`rounded-full px-3 py-1 text-sm transition-colors ${getStepClassName(i, step)}`}
                 onClick={() => setStep(i)}
-                className={`text-sm px-3 py-1 rounded-full transition-colors ${
-                  i === step ? "bg-primary text-primary-foreground"
-                    : i < step ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground"
-                }`}
+                type="button"
               >
                 {s.label}
               </button>
@@ -125,55 +217,149 @@ function CreateServerPage() {
           ))}
         </div>
 
-        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         {step === 0 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Basic Information</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Basic Information</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2"><Label htmlFor="srv-name">Server Name</Label><Input id="srv-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Minecraft Server" required /></div>
-              <div className="space-y-2"><Label htmlFor="srv-desc">Description (optional)</Label><Input id="srv-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A survival server" /></div>
+              <div className="space-y-2">
+                <Label htmlFor="srv-name">Server Name</Label>
+                <Input
+                  id="srv-name"
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="My Minecraft Server"
+                  required
+                  value={name}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="srv-desc">Description (optional)</Label>
+                <Input
+                  id="srv-desc"
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="A survival server"
+                  value={description}
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Owner</Label>
-                <Select value={ownerId} onValueChange={setOwnerId}>
-                  <SelectTrigger><SelectValue placeholder="Select a user..." /></SelectTrigger>
-                  <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.username} ({u.email})</SelectItem>)}</SelectContent>
+                <Select onValueChange={setOwnerId} value={ownerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a user..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.username} ({u.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
-              <div className="flex justify-end"><Button onClick={() => setStep(1)} disabled={!steps[0].valid}>Next</Button></div>
+              <div className="flex justify-end">
+                <Button disabled={!steps[0].valid} onClick={() => setStep(1)}>
+                  Next
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
 
         {step === 1 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Node & Egg</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Node & Egg</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Node</Label>
-                {!nodes.length ? (
-                  <Alert><AlertDescription>No nodes available. <Link to="/admin/nodes" className="underline text-primary">Add a node first.</Link></AlertDescription></Alert>
-                ) : (
-                  <Select value={nodeId} onValueChange={setNodeId}>
-                    <SelectTrigger><SelectValue placeholder="Select a node..." /></SelectTrigger>
-                    <SelectContent>{nodes.map((n) => <SelectItem key={n.id} value={String(n.id)}>{n.name} {n.url ? `(${n.url})` : ""}</SelectItem>)}</SelectContent>
+                {nodes.length ? (
+                  <Select onValueChange={setNodeId} value={nodeId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a node..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {nodes.map((n) => (
+                        <SelectItem key={n.id} value={String(n.id)}>
+                          {n.name} {n.url ? `(${n.url})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
+                ) : (
+                  <Alert>
+                    <AlertDescription>
+                      No nodes available.{" "}
+                      <Link
+                        className="text-primary underline"
+                        to="/admin/nodes"
+                      >
+                        Add a node first.
+                      </Link>
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
               <div className="space-y-2">
                 <Label>Egg</Label>
-                {!eggs.length ? (
-                  <Alert><AlertDescription>No eggs available. <Link to="/admin/eggs" className="underline text-primary">Import an egg first.</Link></AlertDescription></Alert>
-                ) : (
-                  <Select value={eggId} onValueChange={setEggId}>
-                    <SelectTrigger><SelectValue placeholder="Select an egg..." /></SelectTrigger>
-                    <SelectContent>{eggs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent>
+                {eggs.length ? (
+                  <Select onValueChange={setEggId} value={eggId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an egg..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eggs.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
+                ) : (
+                  <Alert>
+                    <AlertDescription>
+                      No eggs available.{" "}
+                      <Link className="text-primary underline" to="/admin/eggs">
+                        Import an egg first.
+                      </Link>
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
+              {dockerImagesMap && Object.keys(dockerImagesMap).length > 1 && (
+                <div className="space-y-2">
+                  <Label>Docker Image</Label>
+                  <Select
+                    onValueChange={setSelectedImage}
+                    value={selectedImage}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select docker image..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(dockerImagesMap).map(([label, uri]) => (
+                        <SelectItem key={label} value={uri}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex justify-between">
-                <Button variant="secondary" onClick={() => setStep(0)}>Back</Button>
-                <Button onClick={() => setStep(2)} disabled={!steps[1].valid}>Next</Button>
+                <Button onClick={() => setStep(0)} variant="secondary">
+                  Back
+                </Button>
+                <Button disabled={!steps[1].valid} onClick={() => setStep(2)}>
+                  Next
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -181,16 +367,57 @@ function CreateServerPage() {
 
         {step === 2 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Resource Limits</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Resource Limits</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label htmlFor="srv-memory">Memory (MB)</Label><Input id="srv-memory" type="number" value={memory} onChange={(e) => setMemory(e.target.value)} min="64" /></div>
-                <div className="space-y-2"><Label htmlFor="srv-cpu">CPU Limit (%)</Label><Input id="srv-cpu" type="number" value={cpu} onChange={(e) => setCpu(e.target.value)} min="10" /></div>
-                <div className="space-y-2"><Label htmlFor="srv-disk">Disk (MB)</Label><Input id="srv-disk" type="number" value={disk} onChange={(e) => setDisk(e.target.value)} min="128" /></div>
-                <div className="space-y-2"><Label htmlFor="srv-port">Primary Port</Label><Input id="srv-port" type="number" value={port} onChange={(e) => setPort(e.target.value)} min="1" max="65535" /></div>
+                <div className="space-y-2">
+                  <Label htmlFor="srv-memory">Memory (MB)</Label>
+                  <Input
+                    id="srv-memory"
+                    min="64"
+                    onChange={(e) => setMemory(e.target.value)}
+                    type="number"
+                    value={memory}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="srv-cpu">CPU Limit (%)</Label>
+                  <Input
+                    id="srv-cpu"
+                    min="10"
+                    onChange={(e) => setCpu(e.target.value)}
+                    type="number"
+                    value={cpu}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="srv-disk">Disk (MB)</Label>
+                  <Input
+                    id="srv-disk"
+                    min="128"
+                    onChange={(e) => setDisk(e.target.value)}
+                    type="number"
+                    value={disk}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="srv-port">Primary Port</Label>
+                  <Input
+                    id="srv-port"
+                    max="65535"
+                    min="1"
+                    onChange={(e) => setPort(e.target.value)}
+                    type="number"
+                    value={port}
+                  />
+                </div>
               </div>
               <div className="flex justify-between">
-                <Button variant="secondary" onClick={() => setStep(1)}>Back</Button>
+                <Button onClick={() => setStep(1)} variant="secondary">
+                  Back
+                </Button>
                 <Button onClick={() => setStep(3)}>Next</Button>
               </div>
             </CardContent>
@@ -199,22 +426,45 @@ function CreateServerPage() {
 
         {step === 3 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Egg Variables</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Egg Variables</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               {!eggDetail || eggDetail.variables.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No variables for this egg.</p>
+                <p className="text-muted-foreground text-sm">
+                  No variables for this egg.
+                </p>
               ) : (
                 eggDetail.variables.map((v) => (
-                  <div key={v.id} className="space-y-1">
+                  <div className="space-y-1" key={v.id}>
                     <Label htmlFor={`var-${v.envVariable}`}>{v.name}</Label>
-                    {v.description && <p className="text-xs text-muted-foreground">{v.description}</p>}
-                    <Input id={`var-${v.envVariable}`} value={variables[v.envVariable] || ""} onChange={(e) => setVariables({ ...variables, [v.envVariable]: e.target.value })} placeholder={v.defaultValue || ""} className="font-mono text-sm" />
-                    <p className="text-xs text-muted-foreground font-mono">{v.envVariable}</p>
+                    {v.description && (
+                      <p className="text-muted-foreground text-xs">
+                        {v.description}
+                      </p>
+                    )}
+                    <Input
+                      className="font-mono text-sm"
+                      id={`var-${v.envVariable}`}
+                      onChange={(e) =>
+                        setVariables({
+                          ...variables,
+                          [v.envVariable]: e.target.value,
+                        })
+                      }
+                      placeholder={v.defaultValue || ""}
+                      value={variables[v.envVariable] || ""}
+                    />
+                    <p className="font-mono text-muted-foreground text-xs">
+                      {v.envVariable}
+                    </p>
                   </div>
                 ))
               )}
               <div className="flex justify-between">
-                <Button variant="secondary" onClick={() => setStep(2)}>Back</Button>
+                <Button onClick={() => setStep(2)} variant="secondary">
+                  Back
+                </Button>
                 <Button onClick={() => setStep(4)}>Next</Button>
               </div>
             </CardContent>
@@ -223,35 +473,97 @@ function CreateServerPage() {
 
         {step === 4 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Review & Create</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Review & Create</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Name:</span><span className="ml-2 font-medium">{name}</span></div>
-                <div><span className="text-muted-foreground">Owner:</span><span className="ml-2 font-medium">{users.find(u => u.id === ownerId)?.username || "-"}</span></div>
-                <div><span className="text-muted-foreground">Node:</span><span className="ml-2 font-medium">{nodes.find(n => String(n.id) === nodeId)?.name || "-"}</span></div>
-                <div><span className="text-muted-foreground">Egg:</span><span className="ml-2 font-medium">{eggs.find(e => e.id === eggId)?.name || "-"}</span></div>
-                <div><span className="text-muted-foreground">Memory:</span><span className="ml-2 font-medium">{memory} MB</span></div>
-                <div><span className="text-muted-foreground">CPU:</span><span className="ml-2 font-medium">{cpu}%</span></div>
-                <div><span className="text-muted-foreground">Disk:</span><span className="ml-2 font-medium">{disk} MB</span></div>
-                <div><span className="text-muted-foreground">Port:</span><span className="ml-2 font-medium">{port}</span></div>
+                <div>
+                  <span className="text-muted-foreground">Name:</span>
+                  <span className="ml-2 font-medium">{name}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Owner:</span>
+                  <span className="ml-2 font-medium">
+                    {users.find((u) => u.id === ownerId)?.username || "-"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Node:</span>
+                  <span className="ml-2 font-medium">
+                    {nodes.find((n) => String(n.id) === nodeId)?.name || "-"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Egg:</span>
+                  <span className="ml-2 font-medium">
+                    {eggs.find((e) => e.id === eggId)?.name || "-"}
+                  </span>
+                </div>
+                {dockerImagesMap && Object.keys(dockerImagesMap).length > 1 && (
+                  <div>
+                    <span className="text-muted-foreground">Docker Image:</span>
+                    <span className="ml-2 font-medium">
+                      {Object.entries(dockerImagesMap).find(
+                        ([, uri]) => uri === selectedImage
+                      )?.[0] ||
+                        selectedImage ||
+                        "-"}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-muted-foreground">Memory:</span>
+                  <span className="ml-2 font-medium">{memory} MB</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">CPU:</span>
+                  <span className="ml-2 font-medium">{cpu}%</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Disk:</span>
+                  <span className="ml-2 font-medium">{disk} MB</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Port:</span>
+                  <span className="ml-2 font-medium">{port}</span>
+                </div>
               </div>
               {eggDetail && eggDetail.variables.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-2">Variables</h3>
+                  <h3 className="mb-2 font-medium text-sm">Variables</h3>
                   <div className="space-y-1">
                     {eggDetail.variables.map((v) => (
-                      <div key={v.id} className="flex text-xs font-mono">
-                        <span className="text-muted-foreground w-48">{v.envVariable}:</span>
-                        <span>{variables[v.envVariable] || v.defaultValue || "(empty)"}</span>
+                      <div className="flex font-mono text-xs" key={v.id}>
+                        <span className="w-48 text-muted-foreground">
+                          {v.envVariable}:
+                        </span>
+                        <span>
+                          {variables[v.envVariable] ||
+                            v.defaultValue ||
+                            "(empty)"}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               <div className="flex justify-between pt-4">
-                <Button variant="secondary" onClick={() => setStep(3)}>Back</Button>
-                <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !name || !ownerId || !nodeId || !eggId}>
-                  <Server className="h-4 w-4 mr-2" /> {createMutation.isPending ? "Creating..." : "Create Server"}
+                <Button onClick={() => setStep(3)} variant="secondary">
+                  Back
+                </Button>
+                <Button
+                  disabled={
+                    createMutation.isPending ||
+                    !name ||
+                    !ownerId ||
+                    !nodeId ||
+                    !eggId
+                  }
+                  onClick={() => createMutation.mutate()}
+                >
+                  <Server className="mr-2 h-4 w-4" />{" "}
+                  {createMutation.isPending ? "Creating..." : "Create Server"}
                 </Button>
               </div>
             </CardContent>

@@ -1,53 +1,179 @@
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@web/lib/api";
 import { Layout } from "@web/components/layout";
-import { Card, CardContent } from "@web/components/ui/card";
-import { Badge } from "@web/components/ui/badge";
+import { Alert, AlertDescription } from "@web/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@web/components/ui/alert-dialog";
 import { Button } from "@web/components/ui/button";
+import { Card, CardContent } from "@web/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@web/components/ui/dialog";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
 import { Skeleton } from "@web/components/ui/skeleton";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader,
-  DialogTitle, DialogTrigger, DialogFooter,
-} from "@web/components/ui/dialog";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@web/components/ui/table";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@web/components/ui/alert-dialog";
-import { Alert, AlertDescription } from "@web/components/ui/alert";
-import {
-  Network, Plus, Trash2, ArrowLeft, Wifi, WifiOff,
-  Copy, Globe, Check,
-} from "lucide-react";
+import { api } from "@web/lib/api";
+import { ArrowLeft, Check, Copy, Network, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 interface NodeItem {
+  createdAt: string;
+  disk: number;
   id: number;
+  memory: number;
   name: string;
   url: string;
-  memory: number;
-  disk: number;
-  createdAt: string;
-}
-
-interface NodeDetail extends NodeItem {
-  stats: {
-    version: string;
-    kernel_version: string;
-    architecture: string;
-    os: string;
-    cpu_count: number;
-  } | null;
 }
 
 interface CreatedNode extends NodeItem {
   configureCommand: string;
+}
+
+function renderNodesList(
+  nodes: NodeItem[] | undefined,
+  isLoading: boolean,
+  deleteMutation: { isPending: boolean; mutate: (id: number) => void }
+) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <Skeleton className="h-16" key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  if (nodes?.length) {
+    return (
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">#</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Wings URL</TableHead>
+              <TableHead className="text-right">Memory</TableHead>
+              <TableHead className="text-right">Disk</TableHead>
+              <TableHead className="w-24" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {nodes.map((node) => (
+              <TableRow key={node.id}>
+                <TableCell className="font-mono text-muted-foreground">
+                  <Link
+                    params={{ nodeId: String(node.id) }}
+                    to="/admin/nodes/$nodeId"
+                  >
+                    {node.id}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Network className="h-4 w-4 text-primary" />
+                    <Link
+                      className="font-medium hover:underline"
+                      params={{ nodeId: String(node.id) }}
+                      to="/admin/nodes/$nodeId"
+                    >
+                      {node.name}
+                    </Link>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {node.url ? (
+                    <span className="font-mono text-muted-foreground text-sm">
+                      {node.url}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">
+                      Not set
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {node.memory > 0 ? `${node.memory} MB` : "-"}
+                </TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {node.disk > 0 ? `${node.disk} MB` : "-"}
+                </TableCell>
+                <TableCell>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        className="text-destructive hover:text-destructive"
+                        size="sm"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Delete node "{node.name}"?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove this node. This
+                          action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => deleteMutation.mutate(node.id)}
+                        >
+                          {deleteMutation.isPending
+                            ? "Deleting..."
+                            : "Delete Node"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <Network className="mb-4 h-12 w-12 text-primary/30" />
+        <p>No nodes configured yet.</p>
+        <p className="text-sm">Add a Wings node to get started.</p>
+      </CardContent>
+    </Card>
+  );
 }
 
 export const Route = createFileRoute("/admin/nodes/")({
@@ -72,13 +198,20 @@ function NodesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; url?: string; memory: number; disk: number }) =>
-      api.post<CreatedNode>("/nodes", data),
+    mutationFn: (data: {
+      name: string;
+      url?: string;
+      memory: number;
+      disk: number;
+    }) => api.post<CreatedNode>("/nodes", data),
     onSuccess: (result) => {
       setCreatedNode(result);
       setDialogOpen(false);
       setResultDialogOpen(true);
-      setName(""); setNodeUrl(""); setMemory("0"); setDisk("0");
+      setName("");
+      setNodeUrl("");
+      setMemory("0");
+      setDisk("0");
       queryClient.invalidateQueries({ queryKey: ["nodes"] });
     },
     onError: (err: Error) => setError(err.message),
@@ -95,8 +228,8 @@ function NodesPage() {
     createMutation.mutate({
       name,
       url: nodeUrl || undefined,
-      memory: parseInt(memory) || 0,
-      disk: parseInt(disk) || 0,
+      memory: Number.parseInt(memory, 10) || 0,
+      disk: Number.parseInt(disk, 10) || 0,
     });
   };
 
@@ -111,43 +244,76 @@ function NodesPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/"><ArrowLeft className="h-4 w-4" /></Link>
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
             </Button>
-            <h1 className="text-2xl font-bold">Nodes</h1>
+            <h1 className="font-bold text-2xl">Nodes</h1>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog onOpenChange={setDialogOpen} open={dialogOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Add Node</Button>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Add Node
+              </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Node</DialogTitle>
-                <DialogDescription>Create a node to get the <code>wings configure</code> command.</DialogDescription>
+                <DialogDescription>
+                  Create a node to get the <code>wings configure</code> command.
+                </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+              <form className="space-y-4" onSubmit={handleCreate}>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="node-name">Name</Label>
-                  <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="US East 1" required />
+                  <Input
+                    id="node-name"
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="US East 1"
+                    required
+                    value={name}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="node-url">Wings URL (optional)</Label>
-                  <Input id="node-url" value={nodeUrl} onChange={(e) => setNodeUrl(e.target.value)} placeholder="https://wings-node1.example.com" />
-                  <p className="text-xs text-muted-foreground">Full URL including protocol and port.</p>
+                  <Input
+                    id="node-url"
+                    onChange={(e) => setNodeUrl(e.target.value)}
+                    placeholder="https://wings-node1.example.com"
+                    value={nodeUrl}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Full URL including protocol and port.
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="node-memory">Memory (MB)</Label>
-                    <Input id="node-memory" type="number" value={memory} onChange={(e) => setMemory(e.target.value)} />
+                    <Input
+                      id="node-memory"
+                      onChange={(e) => setMemory(e.target.value)}
+                      type="number"
+                      value={memory}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="node-disk">Disk (MB)</Label>
-                    <Input id="node-disk" type="number" value={disk} onChange={(e) => setDisk(e.target.value)} />
+                    <Input
+                      id="node-disk"
+                      onChange={(e) => setDisk(e.target.value)}
+                      type="number"
+                      value={disk}
+                    />
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={createMutation.isPending}>
+                  <Button disabled={createMutation.isPending} type="submit">
                     {createMutation.isPending ? "Creating..." : "Create Node"}
                   </Button>
                 </DialogFooter>
@@ -156,100 +322,42 @@ function NodesPage() {
           </Dialog>
         </div>
 
-        <Dialog open={resultDialogOpen} onOpenChange={setResultDialogOpen}>
+        <Dialog onOpenChange={setResultDialogOpen} open={resultDialogOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Node Created</DialogTitle>
-              <DialogDescription>Run this command on your Wings machine. The API token is one-time use.</DialogDescription>
+              <DialogDescription>
+                Run this command on your Wings machine. The API token is
+                one-time use.
+              </DialogDescription>
             </DialogHeader>
             {createdNode && (
               <div className="space-y-4">
-                <div className="rounded-md bg-muted p-3 font-mono text-xs break-all select-all">{createdNode.configureCommand}</div>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => copyToClipboard(createdNode.configureCommand)}>
-                  {commandCopied ? <><Check className="h-4 w-4 mr-2" /> Copied</> : <><Copy className="h-4 w-4 mr-2" /> Copy Command</>}
+                <div className="select-all break-all rounded-md bg-muted p-3 font-mono text-xs">
+                  {createdNode.configureCommand}
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => copyToClipboard(createdNode.configureCommand)}
+                  size="sm"
+                  variant="outline"
+                >
+                  {commandCopied ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-2 h-4 w-4" /> Copy Command
+                    </>
+                  )}
                 </Button>
               </div>
             )}
           </DialogContent>
         </Dialog>
 
-        {isLoading ? (
-          <div className="space-y-3">{[1, 2].map(i => <Skeleton key={i} className="h-16" />)}</div>
-        ) : !nodes?.length ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Network className="h-12 w-12 mb-4 text-primary/30" />
-              <p>No nodes configured yet.</p>
-              <p className="text-sm">Add a Wings node to get started.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Wings URL</TableHead>
-                  <TableHead className="text-right">Memory</TableHead>
-                  <TableHead className="text-right">Disk</TableHead>
-                  <TableHead className="w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {nodes.map((node) => (
-                  <TableRow key={node.id}>
-                    <TableCell className="font-mono text-muted-foreground">
-                      <Link to="/admin/nodes/$nodeId" params={{ nodeId: String(node.id) }}>{node.id}</Link>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Network className="h-4 w-4 text-primary" />
-                        <Link to="/admin/nodes/$nodeId" params={{ nodeId: String(node.id) }} className="font-medium hover:underline">{node.name}</Link>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {node.url ? (
-                        <span className="font-mono text-sm text-muted-foreground">{node.url}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Not set</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{node.memory > 0 ? `${node.memory} MB` : "-"}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{node.disk > 0 ? `${node.disk} MB` : "-"}</TableCell>
-                    <TableCell>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete node "{node.name}"?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently remove this node. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteMutation.mutate(node.id)}
-                              disabled={deleteMutation.isPending}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              {deleteMutation.isPending ? "Deleting..." : "Delete Node"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
+        {renderNodesList(nodes, isLoading, deleteMutation)}
       </div>
     </Layout>
   );

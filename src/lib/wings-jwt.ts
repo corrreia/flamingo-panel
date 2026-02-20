@@ -3,15 +3,15 @@ import { SignJWT } from "jose";
 const encoder = new TextEncoder();
 
 export interface WebsocketTokenPayload {
-  user_uuid: string;
-  server_uuid: string;
   permissions: string[];
+  server_uuid: string;
+  user_uuid: string;
 }
 
-export async function signWingsWebsocketToken(
+export function signWingsWebsocketToken(
   payload: WebsocketTokenPayload,
   nodeToken: string,
-  expiresInSeconds = 600,
+  expiresInSeconds = 600
 ): Promise<string> {
   return new SignJWT({
     user_uuid: payload.user_uuid,

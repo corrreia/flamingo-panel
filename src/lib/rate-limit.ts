@@ -3,7 +3,7 @@ const MAX_ATTEMPTS = 5;
 
 export async function checkRateLimit(
   kv: KVNamespace,
-  key: string,
+  key: string
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
   const kvKey = `ratelimit:${key}`;
   const data = await kv.get(kvKey);
@@ -12,11 +12,15 @@ export async function checkRateLimit(
   let attempts: number[] = data ? JSON.parse(data) : [];
 
   // Remove expired attempts
-  attempts = attempts.filter(t => now - t < WINDOW_MS);
+  attempts = attempts.filter((t) => now - t < WINDOW_MS);
 
   if (attempts.length >= MAX_ATTEMPTS) {
     const oldestInWindow = Math.min(...attempts);
-    return { allowed: false, remaining: 0, resetAt: oldestInWindow + WINDOW_MS };
+    return {
+      allowed: false,
+      remaining: 0,
+      resetAt: oldestInWindow + WINDOW_MS,
+    };
   }
 
   attempts.push(now);
@@ -24,5 +28,9 @@ export async function checkRateLimit(
     expirationTtl: Math.ceil(WINDOW_MS / 1000),
   });
 
-  return { allowed: true, remaining: MAX_ATTEMPTS - attempts.length, resetAt: now + WINDOW_MS };
+  return {
+    allowed: true,
+    remaining: MAX_ATTEMPTS - attempts.length,
+    resetAt: now + WINDOW_MS,
+  };
 }
