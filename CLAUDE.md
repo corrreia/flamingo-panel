@@ -1,106 +1,54 @@
 
 Default to using Bun instead of Node.js.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+- Use `bun install` instead of `npm install`
+- Use `bun run <script>` instead of `npm run <script>`
+- Use `bunx <package>` instead of `npx <package>`
+- Do NOT touch or run database migrations
 
-## APIs
+## Stack
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+- **Runtime:** Cloudflare Workers (via `@cloudflare/vite-plugin` + Miniflare in dev)
+- **API:** Hono + Zod (all routes under `src/api/`)
+- **Frontend:** TanStack Start (SSR) + TanStack Router (file-based routing) + TanStack Query (data fetching)
+- **UI:** React + Tailwind CSS v4 + shadcn/ui + Radix UI
+- **Database:** Cloudflare D1 via Drizzle ORM
+- **Sessions:** Cloudflare KV
+- **Storage:** Cloudflare R2
+- **WebSockets:** Durable Objects
 
-## Testing
+## Project Layout
 
-Use `bun test` to run tests.
+- `src/web/server.ts` — Worker entry point. Routes `/api/*` to Hono, everything else to TanStack Start SSR.
+- `src/web/routes/` — TanStack Router file-based routes (auto-generates `routeTree.gen.ts`)
+- `src/web/router.tsx` — Router config + QueryClient setup
+- `src/web/components/` — shadcn/ui components + Layout
+- `src/web/lib/` — Frontend utilities (API client, auth context)
+- `src/api/` — Hono API routes (auth, servers, nodes, eggs, files, remote)
+- `src/db/schema.ts` — Drizzle schema
+- `src/durable-objects/` — Durable Object classes
+- `wrangler.jsonc` — Cloudflare Worker config (D1, KV, R2, DO bindings)
+- `vite.config.ts` — Vite + TanStack Start + Cloudflare plugin config
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+## Scripts
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
+- `bun run dev` — Start dev server (Vite + Miniflare with all CF bindings)
+- `bun run build` — Production build (client + server bundles)
+- `bun run deploy` — Build + deploy to Cloudflare
 
-## Frontend
+## Frontend Conventions
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+- Routes go in `src/web/routes/` using TanStack Router file-based routing
+- Use `useQuery` / `useMutation` from TanStack Query for all data fetching — not `useEffect` + `useState`
+- Use `<Link to="...">` from `@tanstack/react-router` for navigation — not `<a href>`
+- Use `useNavigate()` for programmatic navigation
+- Use `queryClient.invalidateQueries()` after mutations to refresh data
+- Wrap authenticated pages in `<Layout>` component
+- Access CF bindings in server code via `import { env } from "cloudflare:workers"`
 
-Server:
+## API Conventions
 
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+- All API routes are Hono handlers under `src/api/`
+- Auth middleware at `src/api/middleware/auth.ts`
+- Zod for request validation
+- Wings communication via `src/lib/wings-client.ts`
