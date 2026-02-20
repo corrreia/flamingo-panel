@@ -30,3 +30,4 @@ export default {
 };
 
 export { ConsoleSession } from "../durable-objects/console-session";
+export { NodeMetrics } from "../durable-objects/node-metrics";

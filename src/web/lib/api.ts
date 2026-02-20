@@ -5,20 +5,16 @@ async function request<T>(
   path: string,
   body?: unknown
 ): Promise<T> {
-  const token = localStorage.getItem("session_token");
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: body ? JSON.stringify(body) : undefined,
   });
 
   if (res.status === 401) {
-    localStorage.removeItem("session_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("session");
     window.location.href = "/login";
     throw new Error("Unauthorized");
   }

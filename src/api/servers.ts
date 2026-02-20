@@ -403,53 +403,9 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
   return c.json({ ticket });
 });
 
-// WebSocket console proxy via Durable Object (ticket-authenticated)
-serverRoutes.get("/:id/console", async (c) => {
-  const ticket = c.req.query("ticket");
-  if (!ticket) {
-    return c.json({ error: "Missing ticket" }, 401);
-  }
-
-  // Validate and consume the one-time ticket
-  const ticketKey = `console-ticket:${ticket}`;
-  const ticketData = await c.env.KV.get(ticketKey);
-  if (!ticketData) {
-    return c.json({ error: "Invalid or expired ticket" }, 401);
-  }
-
-  // Delete immediately (one-time use)
-  await c.env.KV.delete(ticketKey);
-
-  const data = JSON.parse(ticketData) as {
-    serverId: string;
-    serverUuid: string;
-    userId: string;
-    wingsUrl: string;
-    wingsToken: string;
-  };
-
-  // Verify the URL param matches the ticket's server
-  if (data.serverId !== c.req.param("id")) {
-    return c.json({ error: "Ticket/server mismatch" }, 403);
-  }
-
-  // Forward WebSocket upgrade to the DO
-  const doId = c.env.CONSOLE_SESSION.idFromName(data.serverUuid);
-  const stub = c.env.CONSOLE_SESSION.get(doId);
-
-  return stub.fetch(
-    new Request("https://internal/connect", {
-      method: "POST",
-      headers: c.req.raw.headers,
-      body: JSON.stringify({
-        wingsUrl: data.wingsUrl,
-        wingsToken: data.wingsToken,
-        userId: data.userId,
-        serverId: data.serverId,
-      }),
-    })
-  );
-});
+// NOTE: The WebSocket console endpoint (/:id/console) is registered in
+// src/api/index.ts to bypass the requireAuth middleware, since browsers
+// cannot send Authorization headers on WebSocket upgrade requests.
 
 // Delete server
 serverRoutes.delete("/:id", async (c) => {

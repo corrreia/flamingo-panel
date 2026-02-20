@@ -290,11 +290,23 @@ export interface SystemInfo {
 }
 
 export interface SystemUtilization {
-  cpu_usage: number;
+  cpu_percent: number;
+  disk_details: {
+    device: string;
+    mountpoint: string;
+    total_space: number;
+    used_space: number;
+    tags: string[];
+  }[];
   disk_total: number;
   disk_used: number;
+  load_average1: number;
+  load_average5: number;
+  load_average15: number;
   memory_total: number;
   memory_used: number;
+  swap_total: number;
+  swap_used: number;
 }
 
 export interface ServerApiResponse {

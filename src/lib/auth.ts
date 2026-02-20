@@ -1,208 +1,67 @@
-// Password hashing using Web Crypto API (Workers-compatible)
-// PBKDF2-SHA256 with 600k iterations (OWASP recommendation)
+import { env } from "cloudflare:workers";
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { genericOAuth } from "better-auth/plugins";
+import { drizzle } from "drizzle-orm/d1";
+import * as authSchema from "../db/auth-schema";
 
-const PBKDF2_ITERATIONS = 600_000;
-const SALT_LENGTH = 16;
-const HASH_LENGTH = 32;
+const db = drizzle(env.DB);
 
-export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const hash = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-    key,
-    HASH_LENGTH * 8
-  );
-  const saltHex = toHex(salt);
-  const hashHex = toHex(new Uint8Array(hash));
-  return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
-}
+export const auth = betterAuth({
+  baseURL: env.PANEL_URL,
+  basePath: "/api/auth",
+  secret: env.BETTER_AUTH_SECRET,
+  database: drizzleAdapter(db, {
+    provider: "sqlite",
+    usePlural: true,
+    schema: {
+      user: authSchema.users,
+      session: authSchema.sessions,
+      account: authSchema.accounts,
+      verification: authSchema.verifications,
+    },
+  }),
+  user: {
+    additionalFields: {
+      role: {
+        type: ["user", "admin"] as const,
+        required: false,
+        defaultValue: "user",
+        input: false,
+      },
+      username: {
+        type: "string",
+        required: false,
+        defaultValue: "",
+        input: false,
+      },
+    },
+    modelName: "users",
+  },
+  session: {
+    modelName: "sessions",
+  },
+  account: {
+    modelName: "accounts",
+  },
+  plugins: [
+    genericOAuth({
+      config: [
+        {
+          providerId: "pocket-id",
+          clientId: env.OIDC_CLIENT_ID,
+          clientSecret: env.OIDC_CLIENT_SECRET,
+          discoveryUrl: env.OIDC_DISCOVERY_URL,
+          scopes: ["openid", "email", "profile"],
+          mapProfileToUser: (profile) => ({
+            name: profile.name || profile.preferred_username || "",
+            username:
+              profile.preferred_username || profile.email?.split("@")[0] || "",
+          }),
+        },
+      ],
+    }),
+  ],
+});
 
-export async function verifyPassword(
-  password: string,
-  stored: string
-): Promise<boolean> {
-  const parts = stored.split(":");
-  if (parts[0] !== "pbkdf2" || parts.length !== 4) {
-    return false;
-  }
-
-  const iterationsStr = parts[1];
-  const saltStr = parts[2];
-  const expectedHash = parts[3];
-  if (!(iterationsStr && saltStr && expectedHash)) {
-    return false;
-  }
-  const iterations = Number.parseInt(iterationsStr, 10);
-  const salt = fromHex(saltStr);
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const hash = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-    key,
-    HASH_LENGTH * 8
-  );
-  return toHex(new Uint8Array(hash)) === expectedHash;
-}
-
-function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function fromHex(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = Number.parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-// Session management (KV-backed)
-
-export interface Session {
-  createdAt: number;
-  email: string;
-  expiresAt: number;
-  ip: string;
-  refreshToken: string;
-  role: "admin" | "user";
-  userAgent: string;
-  userId: string;
-}
-
-function generateToken(bytes: number): string {
-  const buf = crypto.getRandomValues(new Uint8Array(bytes));
-  return toHex(buf);
-}
-
-export const generateSessionId = () => generateToken(32);
-export const generateRefreshToken = () => generateToken(48);
-
-const SESSION_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
-const SESSION_PREFIX = "session:";
-
-export async function createSession(
-  kv: KVNamespace,
-  userId: string,
-  email: string,
-  role: "admin" | "user",
-  ip: string,
-  userAgent: string
-): Promise<{ sessionId: string; refreshToken: string; expiresAt: number }> {
-  const sessionId = generateSessionId();
-  const refreshToken = generateRefreshToken();
-  const now = Date.now();
-  const expiresAt = now + SESSION_TTL * 1000;
-
-  const session: Session = {
-    userId,
-    email,
-    role,
-    createdAt: now,
-    expiresAt,
-    refreshToken,
-    ip,
-    userAgent,
-  };
-
-  await kv.put(`${SESSION_PREFIX}${sessionId}`, JSON.stringify(session), {
-    expirationTtl: SESSION_TTL,
-  });
-
-  // Track active sessions per user (for listing/revoking)
-  const userSessions = JSON.parse(
-    (await kv.get(`user-sessions:${userId}`)) || "[]"
-  ) as string[];
-  userSessions.push(sessionId);
-  await kv.put(`user-sessions:${userId}`, JSON.stringify(userSessions), {
-    expirationTtl: SESSION_TTL,
-  });
-
-  return { sessionId, refreshToken, expiresAt };
-}
-
-export async function getSession(
-  kv: KVNamespace,
-  sessionId: string
-): Promise<Session | null> {
-  const data = await kv.get(`${SESSION_PREFIX}${sessionId}`);
-  if (!data) {
-    return null;
-  }
-  const session = JSON.parse(data) as Session;
-  if (session.expiresAt < Date.now()) {
-    await kv.delete(`${SESSION_PREFIX}${sessionId}`);
-    return null;
-  }
-  return session;
-}
-
-export async function deleteSession(
-  kv: KVNamespace,
-  sessionId: string
-): Promise<void> {
-  const session = await getSession(kv, sessionId);
-  if (session) {
-    const userSessions = JSON.parse(
-      (await kv.get(`user-sessions:${session.userId}`)) || "[]"
-    ) as string[];
-    await kv.put(
-      `user-sessions:${session.userId}`,
-      JSON.stringify(userSessions.filter((s) => s !== sessionId))
-    );
-  }
-  await kv.delete(`${SESSION_PREFIX}${sessionId}`);
-}
-
-export async function refreshSession(
-  kv: KVNamespace,
-  sessionId: string,
-  refreshToken: string
-): Promise<{
-  sessionId: string;
-  refreshToken: string;
-  expiresAt: number;
-} | null> {
-  const session = await getSession(kv, sessionId);
-  if (!session || session.refreshToken !== refreshToken) {
-    return null;
-  }
-
-  // Rotate: delete old session, create new one
-  await deleteSession(kv, sessionId);
-  return createSession(
-    kv,
-    session.userId,
-    session.email,
-    session.role,
-    session.ip,
-    session.userAgent
-  );
-}
-
-export async function revokeAllUserSessions(
-  kv: KVNamespace,
-  userId: string
-): Promise<void> {
-  const userSessions = JSON.parse(
-    (await kv.get(`user-sessions:${userId}`)) || "[]"
-  ) as string[];
-  await Promise.all(
-    userSessions.map((sid) => kv.delete(`${SESSION_PREFIX}${sid}`))
-  );
-  await kv.delete(`user-sessions:${userId}`);
-}
+export type Auth = typeof auth;

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { StatCard } from "@web/components/stat-card";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   AlertDialog,
@@ -24,15 +25,17 @@ import {
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
 import { Skeleton } from "@web/components/ui/skeleton";
+import { useNodeMetrics } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
+import { formatBytes } from "@web/lib/format";
 import {
   ArrowLeft,
   Check,
   Copy,
   Cpu,
   Globe,
+  HardDrive,
   MemoryStick,
-  RefreshCw,
   Save,
   Server,
   Terminal,
@@ -86,12 +89,12 @@ function NodeDetailPage() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
-  const [memory, setMemory] = useState("0");
-  const [disk, setDisk] = useState("0");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [configureCommand, setConfigureCommand] = useState("");
   const [commandCopied, setCommandCopied] = useState(false);
+
+  const metrics = useNodeMetrics(nodeId);
 
   const { data: node, isLoading } = useQuery({
     queryKey: ["node", nodeId],
@@ -99,8 +102,6 @@ function NodeDetailPage() {
       const data = await api.get<NodeDetail>(`/nodes/${nodeId}`);
       setName(data.name);
       setUrl(data.url);
-      setMemory(String(data.memory));
-      setDisk(String(data.disk));
       return data;
     },
   });
@@ -110,8 +111,6 @@ function NodeDetailPage() {
       api.put(`/nodes/${nodeId}`, {
         name,
         url,
-        memory: Number.parseInt(memory, 10) || 0,
-        disk: Number.parseInt(disk, 10) || 0,
       }),
     onSuccess: () => {
       setSuccess("Node updated");
@@ -184,8 +183,12 @@ function NodeDetailPage() {
               <h1 className="font-bold text-2xl">{node.name}</h1>
               <p className="text-muted-foreground text-sm">Node #{node.id}</p>
             </div>
-            <Badge variant={node.stats ? "default" : "secondary"}>
-              {node.stats ? (
+            <Badge
+              variant={
+                metrics.connected || node.stats ? "default" : "secondary"
+              }
+            >
+              {metrics.connected || node.stats ? (
                 <>
                   <Wifi className="mr-1 h-3 w-3" /> Online
                 </>
@@ -196,16 +199,27 @@ function NodeDetailPage() {
               )}
             </Badge>
           </div>
-          <Button
-            onClick={() =>
-              queryClient.invalidateQueries({ queryKey: ["node", nodeId] })
-            }
-            size="sm"
-            variant="outline"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-          </Button>
         </div>
+
+        {metrics.utilization && (
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard
+              icon={<Cpu className="h-4 w-4" />}
+              label="CPU"
+              value={`${metrics.utilization.cpu_percent.toFixed(1)}%`}
+            />
+            <StatCard
+              icon={<MemoryStick className="h-4 w-4" />}
+              label="Memory"
+              value={`${formatBytes(metrics.utilization.memory_used)} / ${formatBytes(metrics.utilization.memory_total)}`}
+            />
+            <StatCard
+              icon={<HardDrive className="h-4 w-4" />}
+              label="Disk"
+              value={`${formatBytes(metrics.utilization.disk_used)} / ${formatBytes(metrics.utilization.disk_total)}`}
+            />
+          </div>
+        )}
 
         {error && (
           <Alert variant="destructive">
@@ -226,66 +240,73 @@ function NodeDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {node.stats ? (
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Wings Version</span>
-                    <span className="font-mono">{node.stats.version}</span>
+              {(() => {
+                const info = metrics.systemInfo ?? node.stats;
+                if (!info) {
+                  return (
+                    <p className="text-muted-foreground text-sm">
+                      {node.url
+                        ? "Could not connect to Wings."
+                        : "Set the Wings URL below to connect."}
+                    </p>
+                  );
+                }
+                return (
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Wings Version
+                      </span>
+                      <span className="font-mono">{info.version}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">OS</span>
+                      <span className="font-mono">{info.system.os}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Kernel</span>
+                      <span className="font-mono">
+                        {info.system.kernel_version}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Architecture
+                      </span>
+                      <span className="font-mono">
+                        {info.system.architecture}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">CPU Threads</span>
+                      <span className="flex items-center gap-1 font-mono">
+                        <Cpu className="h-3 w-3" /> {info.system.cpu_threads}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Memory</span>
+                      <span className="flex items-center gap-1 font-mono">
+                        <MemoryStick className="h-3 w-3" />{" "}
+                        {Math.round(
+                          info.system.memory_bytes / 1024 / 1024 / 1024
+                        )}{" "}
+                        GB
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Docker</span>
+                      <span className="font-mono">{info.docker.version}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Containers</span>
+                      <span className="font-mono">
+                        {info.docker.containers.running} running /{" "}
+                        {info.docker.containers.total} total
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">OS</span>
-                    <span className="font-mono">{node.stats.system.os}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Kernel</span>
-                    <span className="font-mono">
-                      {node.stats.system.kernel_version}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Architecture</span>
-                    <span className="font-mono">
-                      {node.stats.system.architecture}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">CPU Threads</span>
-                    <span className="flex items-center gap-1 font-mono">
-                      <Cpu className="h-3 w-3" />{" "}
-                      {node.stats.system.cpu_threads}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Memory</span>
-                    <span className="flex items-center gap-1 font-mono">
-                      <MemoryStick className="h-3 w-3" />{" "}
-                      {Math.round(
-                        node.stats.system.memory_bytes / 1024 / 1024 / 1024
-                      )}{" "}
-                      GB
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Docker</span>
-                    <span className="font-mono">
-                      {node.stats.docker.version}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Containers</span>
-                    <span className="font-mono">
-                      {node.stats.docker.containers.running} running /{" "}
-                      {node.stats.docker.containers.total} total
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  {node.url
-                    ? "Could not connect to Wings."
-                    : "Set the Wings URL below to connect."}
-                </p>
-              )}
+                );
+              })()}
             </CardContent>
           </Card>
 
@@ -336,24 +357,6 @@ function NodeDetailPage() {
                   <p className="text-muted-foreground text-xs">
                     Full URL with protocol.
                   </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-memory">Memory (MB)</Label>
-                  <Input
-                    id="edit-memory"
-                    onChange={(e) => setMemory(e.target.value)}
-                    type="number"
-                    value={memory}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-disk">Disk (MB)</Label>
-                  <Input
-                    id="edit-disk"
-                    onChange={(e) => setDisk(e.target.value)}
-                    type="number"
-                    value={disk}
-                  />
                 </div>
               </div>
               {configureCommand && (

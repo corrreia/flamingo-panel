@@ -7,6 +7,11 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+// Re-export Better Auth tables from dedicated schema file
+export { accounts, sessions, users, verifications } from "./auth-schema";
+
+import { users } from "./auth-schema";
+
 const id = () =>
   text("id")
     .primaryKey()
@@ -16,16 +21,7 @@ const timestamps = {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 };
 
-export const users = sqliteTable("users", {
-  id: id(),
-  email: text("email").notNull().unique(),
-  username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  role: text("role", { enum: ["admin", "user"] })
-    .notNull()
-    .default("user"),
-  ...timestamps,
-});
+// ─── Application tables ──────────────────────────────────────────────────────
 
 export const nodes = sqliteTable("nodes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -37,6 +33,7 @@ export const nodes = sqliteTable("nodes", {
   memoryOverallocate: integer("memory_overallocate").notNull().default(0),
   disk: integer("disk").notNull().default(0),
   diskOverallocate: integer("disk_overallocate").notNull().default(0),
+  cpuThreads: integer("cpu_threads").notNull().default(0),
   uploadSize: integer("upload_size").notNull().default(100),
   ...timestamps,
 });

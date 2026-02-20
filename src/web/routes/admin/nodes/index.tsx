@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { StatCard } from "@web/components/stat-card";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import { Card, CardContent } from "@web/components/ui/card";
@@ -24,11 +25,24 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
+import { useNodeMetrics } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
-import { ArrowLeft, Check, Copy, Network, Plus } from "lucide-react";
-import { useState } from "react";
+import { formatBytes } from "@web/lib/format";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  Network,
+  Plus,
+} from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import type { SystemInfo, SystemUtilization } from "../../../lib/wings-client";
 
 interface NodeItem {
+  cpuThreads: number;
   createdAt: string;
   disk: number;
   id: number;
@@ -41,7 +55,109 @@ interface CreatedNode extends NodeItem {
   configureCommand: string;
 }
 
-function renderNodesList(nodes: NodeItem[] | undefined, isLoading: boolean) {
+interface NodeMetricsReport {
+  connected: boolean;
+  nodeId: number;
+  systemInfo: SystemInfo | null;
+  utilization: SystemUtilization | null;
+}
+
+function NodeRow({
+  node,
+  onMetrics,
+}: {
+  node: NodeItem;
+  onMetrics: (report: NodeMetricsReport) => void;
+}) {
+  const metrics = useNodeMetrics(node.url ? node.id : null);
+
+  // Report metrics to parent for aggregation
+  const prevRef = useMemo(
+    () => ({
+      connected: false,
+      systemInfo: null as SystemInfo | null,
+      utilization: null as SystemUtilization | null,
+    }),
+    []
+  );
+
+  if (
+    metrics.connected !== prevRef.connected ||
+    metrics.systemInfo !== prevRef.systemInfo ||
+    metrics.utilization !== prevRef.utilization
+  ) {
+    prevRef.connected = metrics.connected;
+    prevRef.systemInfo = metrics.systemInfo;
+    prevRef.utilization = metrics.utilization;
+    // Schedule report to avoid calling during render
+    queueMicrotask(() =>
+      onMetrics({
+        nodeId: node.id,
+        connected: metrics.connected,
+        systemInfo: metrics.systemInfo,
+        utilization: metrics.utilization,
+      })
+    );
+  }
+
+  return (
+    <TableRow>
+      <TableCell className="font-mono text-muted-foreground">
+        <Link params={{ nodeId: String(node.id) }} to="/admin/nodes/$nodeId">
+          {node.id}
+        </Link>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-block h-2 w-2 rounded-full ${metrics.connected ? "bg-green-500" : "bg-gray-400"}`}
+          />
+          <Link
+            className="font-medium hover:underline"
+            params={{ nodeId: String(node.id) }}
+            to="/admin/nodes/$nodeId"
+          >
+            {node.name}
+          </Link>
+        </div>
+      </TableCell>
+      <TableCell>
+        {node.url ? (
+          <span className="font-mono text-muted-foreground text-sm">
+            {node.url}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">Not set</span>
+        )}
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">
+        {metrics.systemInfo
+          ? `${metrics.systemInfo.system.cpu_threads} cores`
+          : (node.cpuThreads > 0 && `${node.cpuThreads} cores`) || "-"}
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">
+        {metrics.systemInfo
+          ? formatBytes(metrics.systemInfo.system.memory_bytes)
+          : (node.memory > 0 && `${node.memory} MB`) || "-"}
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">
+        {metrics.utilization
+          ? formatBytes(metrics.utilization.disk_total)
+          : (node.disk > 0 && `${node.disk} MB`) || "-"}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function NodesList({
+  nodes,
+  isLoading,
+  onNodeMetrics,
+}: {
+  nodes: NodeItem[] | undefined;
+  isLoading: boolean;
+  onNodeMetrics: (report: NodeMetricsReport) => void;
+}) {
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -61,51 +177,14 @@ function renderNodesList(nodes: NodeItem[] | undefined, isLoading: boolean) {
               <TableHead className="w-12">#</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Wings URL</TableHead>
+              <TableHead className="text-right">CPU</TableHead>
               <TableHead className="text-right">Memory</TableHead>
               <TableHead className="text-right">Disk</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {nodes.map((node) => (
-              <TableRow key={node.id}>
-                <TableCell className="font-mono text-muted-foreground">
-                  <Link
-                    params={{ nodeId: String(node.id) }}
-                    to="/admin/nodes/$nodeId"
-                  >
-                    {node.id}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Network className="h-4 w-4 text-primary" />
-                    <Link
-                      className="font-medium hover:underline"
-                      params={{ nodeId: String(node.id) }}
-                      to="/admin/nodes/$nodeId"
-                    >
-                      {node.name}
-                    </Link>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {node.url ? (
-                    <span className="font-mono text-muted-foreground text-sm">
-                      {node.url}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">
-                      Not set
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {node.memory > 0 ? `${node.memory} MB` : "-"}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {node.disk > 0 ? `${node.disk} MB` : "-"}
-                </TableCell>
-              </TableRow>
+              <NodeRow key={node.id} node={node} onMetrics={onNodeMetrics} />
             ))}
           </TableBody>
         </Table>
@@ -137,8 +216,52 @@ function NodesPage() {
   const [commandCopied, setCommandCopied] = useState(false);
   const [name, setName] = useState("");
   const [nodeUrl, setNodeUrl] = useState("");
-  const [memory, setMemory] = useState("0");
-  const [disk, setDisk] = useState("0");
+
+  const [metricsMap, setMetricsMap] = useState<Map<number, NodeMetricsReport>>(
+    new Map()
+  );
+
+  const handleNodeMetrics = useCallback((report: NodeMetricsReport) => {
+    setMetricsMap((prev) => {
+      const next = new Map(prev);
+      next.set(report.nodeId, report);
+      return next;
+    });
+  }, []);
+
+  const aggregate = useMemo(() => {
+    let totalCpuThreads = 0;
+    let cpuUsageSum = 0;
+    let cpuUsageCount = 0;
+    let memoryUsed = 0;
+    let memoryTotal = 0;
+    let diskUsed = 0;
+    let diskTotal = 0;
+
+    for (const report of metricsMap.values()) {
+      if (report.systemInfo) {
+        totalCpuThreads += report.systemInfo.system.cpu_threads;
+      }
+      if (report.utilization) {
+        cpuUsageSum += report.utilization.cpu_percent;
+        cpuUsageCount++;
+        memoryUsed += report.utilization.memory_used;
+        memoryTotal += report.utilization.memory_total;
+        diskUsed += report.utilization.disk_used;
+        diskTotal += report.utilization.disk_total;
+      }
+    }
+
+    return {
+      totalCpuThreads,
+      cpuUsage: cpuUsageCount > 0 ? cpuUsageSum / cpuUsageCount : 0,
+      memoryUsed,
+      memoryTotal,
+      diskUsed,
+      diskTotal,
+      hasData: cpuUsageCount > 0,
+    };
+  }, [metricsMap]);
 
   const { data: nodes, isLoading } = useQuery({
     queryKey: ["nodes"],
@@ -146,20 +269,14 @@ function NodesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: {
-      name: string;
-      url?: string;
-      memory: number;
-      disk: number;
-    }) => api.post<CreatedNode>("/nodes", data),
+    mutationFn: (data: { name: string; url?: string }) =>
+      api.post<CreatedNode>("/nodes", data),
     onSuccess: (result) => {
       setCreatedNode(result);
       setDialogOpen(false);
       setResultDialogOpen(true);
       setName("");
       setNodeUrl("");
-      setMemory("0");
-      setDisk("0");
       queryClient.invalidateQueries({ queryKey: ["nodes"] });
     },
     onError: (err: Error) => setError(err.message),
@@ -171,8 +288,6 @@ function NodesPage() {
     createMutation.mutate({
       name,
       url: nodeUrl || undefined,
-      memory: Number.parseInt(memory, 10) || 0,
-      disk: Number.parseInt(disk, 10) || 0,
     });
   };
 
@@ -235,26 +350,6 @@ function NodesPage() {
                     Full URL including protocol and port.
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="node-memory">Memory (MB)</Label>
-                    <Input
-                      id="node-memory"
-                      onChange={(e) => setMemory(e.target.value)}
-                      type="number"
-                      value={memory}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="node-disk">Disk (MB)</Label>
-                    <Input
-                      id="node-disk"
-                      onChange={(e) => setDisk(e.target.value)}
-                      type="number"
-                      value={disk}
-                    />
-                  </div>
-                </div>
                 <DialogFooter>
                   <Button disabled={createMutation.isPending} type="submit">
                     {createMutation.isPending ? "Creating..." : "Create Node"}
@@ -300,7 +395,36 @@ function NodesPage() {
           </DialogContent>
         </Dialog>
 
-        {renderNodesList(nodes, isLoading)}
+        {aggregate.hasData && (
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard
+              icon={<Cpu className="h-4 w-4" />}
+              label="Total CPUs"
+              value={String(aggregate.totalCpuThreads)}
+            />
+            <StatCard
+              icon={<Cpu className="h-4 w-4" />}
+              label="CPU Usage"
+              value={`${aggregate.cpuUsage.toFixed(1)}%`}
+            />
+            <StatCard
+              icon={<MemoryStick className="h-4 w-4" />}
+              label="Memory"
+              value={`${formatBytes(aggregate.memoryUsed)} / ${formatBytes(aggregate.memoryTotal)}`}
+            />
+            <StatCard
+              icon={<HardDrive className="h-4 w-4" />}
+              label="Disk"
+              value={`${formatBytes(aggregate.diskUsed)} / ${formatBytes(aggregate.diskTotal)}`}
+            />
+          </div>
+        )}
+
+        <NodesList
+          isLoading={isLoading}
+          nodes={nodes}
+          onNodeMetrics={handleNodeMetrics}
+        />
       </div>
     </Layout>
   );

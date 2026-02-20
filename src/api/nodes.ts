@@ -13,11 +13,7 @@ nodeRoutes.use("*", requireAuth);
 
 const createNodeSchema = z.object({
   name: z.string().min(1).max(255),
-  url: z.string().default(""), // full Wings URL, can be set later
-  memory: z.number().int().min(0).default(0),
-  memoryOverallocate: z.number().int().default(0),
-  disk: z.number().int().min(0).default(0),
-  diskOverallocate: z.number().int().default(0),
+  url: z.string().default(""),
 });
 
 // List all nodes
@@ -30,6 +26,7 @@ nodeRoutes.get("/", requireAdmin, async (c) => {
       url: schema.nodes.url,
       memory: schema.nodes.memory,
       disk: schema.nodes.disk,
+      cpuThreads: schema.nodes.cpuThreads,
       createdAt: schema.nodes.createdAt,
     })
     .from(schema.nodes)
@@ -53,7 +50,37 @@ nodeRoutes.get("/:id", requireAdmin, async (c) => {
   if (node.url) {
     try {
       const client = new WingsClient(node);
-      stats = await client.getSystemInfo();
+      const [sysInfo, utilization] = await Promise.all([
+        client.getSystemInfo(),
+        client.getSystemUtilization(),
+      ]);
+      stats = sysInfo;
+
+      // Sync detected hardware stats to DB (non-blocking)
+      const detectedMemory = Math.round(
+        sysInfo.system.memory_bytes / 1024 / 1024
+      );
+      const detectedDisk = Math.round(utilization.disk_total / 1024 / 1024);
+      const detectedCpu = sysInfo.system.cpu_threads;
+
+      if (
+        node.memory !== detectedMemory ||
+        node.disk !== detectedDisk ||
+        node.cpuThreads !== detectedCpu
+      ) {
+        c.executionCtx.waitUntil(
+          db
+            .update(schema.nodes)
+            .set({
+              memory: detectedMemory,
+              disk: detectedDisk,
+              cpuThreads: detectedCpu,
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(schema.nodes.id, node.id))
+            .run()
+        );
+      }
     } catch {
       // Node might be offline
     }
@@ -111,9 +138,7 @@ const updateNodeSchema = z
   .object({
     name: z.string().min(1).max(255),
     url: z.string(),
-    memory: z.number().int().min(0),
     memoryOverallocate: z.number().int(),
-    disk: z.number().int().min(0),
     diskOverallocate: z.number().int(),
   })
   .partial();
@@ -162,6 +187,35 @@ nodeRoutes.post("/:id/reconfigure", requireAdmin, async (c) => {
   return c.json({
     configureCommand: `wings configure --panel-url ${c.env.PANEL_URL} --token ${apiToken} --node ${node.id}`,
   });
+});
+
+// Issue a short-lived metrics ticket (admin only)
+nodeRoutes.get("/:id/metrics-ticket", requireAdmin, async (c) => {
+  const db = getDb(c.env.DB);
+  const node = await db
+    .select()
+    .from(schema.nodes)
+    .where(eq(schema.nodes.id, Number(c.req.param("id"))))
+    .get();
+  if (!node) {
+    return c.json({ error: "Node not found" }, 404);
+  }
+  if (!node.url) {
+    return c.json({ error: "Node has no Wings URL configured" }, 400);
+  }
+
+  const ticket = crypto.randomUUID();
+  await c.env.KV.put(
+    `metrics-ticket:${ticket}`,
+    JSON.stringify({
+      nodeId: node.id,
+      wingsUrl: node.url,
+      wingsToken: node.token,
+    }),
+    { expirationTtl: 60 }
+  );
+
+  return c.json({ ticket });
 });
 
 // Delete node

@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import { getSession, type Session } from "../../lib/auth";
+import { auth } from "../../lib/auth";
 
 export interface AuthUser {
   email: string;
@@ -10,32 +10,26 @@ export interface AuthUser {
 interface AuthEnv {
   Bindings: Env;
   Variables: {
-    session: Session;
-    sessionId: string;
     user: AuthUser;
   };
 }
 
-// Middleware that requires a valid session
+// Middleware that requires a valid Better Auth session (cookie-based)
 export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
-  const header = c.req.header("Authorization");
-  if (!header?.startsWith("Bearer ")) {
-    return c.json({ error: "Missing authorization header" }, 401);
-  }
-
-  const sessionId = header.slice(7);
-  const session = await getSession(c.env.KV, sessionId);
-  if (!session) {
-    return c.json({ error: "Invalid or expired session" }, 401);
-  }
-
-  c.set("session", session);
-  c.set("sessionId", sessionId);
-  c.set("user", {
-    id: session.userId,
-    email: session.email,
-    role: session.role,
+  const session = await auth.api.getSession({
+    headers: c.req.raw.headers,
   });
+
+  if (!session) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  c.set("user", {
+    id: session.user.id,
+    email: session.user.email,
+    role: (session.user as Record<string, unknown>).role as "admin" | "user",
+  });
+
   await next();
 });
 

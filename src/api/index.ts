@@ -13,6 +13,88 @@ export const apiRoutes = new Hono<{ Bindings: Env }>();
 
 apiRoutes.get("/health", (c) => c.json({ status: "ok", version: "0.1.0" }));
 
+// WebSocket endpoints: registered BEFORE sub-routers to bypass requireAuth
+// (browsers cannot send Authorization headers on WebSocket upgrade requests)
+
+// Node metrics WebSocket (ticket-authenticated)
+apiRoutes.get("/nodes/:id/metrics", async (c) => {
+  const ticket = c.req.query("ticket");
+  if (!ticket) {
+    return c.json({ error: "Missing ticket" }, 401);
+  }
+
+  const ticketKey = `metrics-ticket:${ticket}`;
+  const ticketData = await c.env.KV.get(ticketKey);
+  if (!ticketData) {
+    return c.json({ error: "Invalid or expired ticket" }, 401);
+  }
+
+  await c.env.KV.delete(ticketKey);
+
+  const data = JSON.parse(ticketData) as {
+    nodeId: number;
+    wingsUrl: string;
+    wingsToken: string;
+  };
+
+  if (data.nodeId !== Number(c.req.param("id"))) {
+    return c.json({ error: "Ticket/node mismatch" }, 403);
+  }
+
+  const doId = c.env.NODE_METRICS.idFromName(`node-${data.nodeId}`);
+  const stub = c.env.NODE_METRICS.get(doId);
+
+  // Forward the original WebSocket upgrade request to the DO.
+  // Pass Wings credentials via URL params (internal Worker→DO only).
+  const connectUrl = new URL("https://internal/connect");
+  connectUrl.searchParams.set("nodeId", String(data.nodeId));
+  connectUrl.searchParams.set("wingsUrl", data.wingsUrl);
+  connectUrl.searchParams.set("wingsToken", data.wingsToken);
+
+  return stub.fetch(new Request(connectUrl.toString(), c.req.raw));
+});
+
+// Console WebSocket (ticket-authenticated)
+apiRoutes.get("/servers/:id/console", async (c) => {
+  const ticket = c.req.query("ticket");
+  if (!ticket) {
+    return c.json({ error: "Missing ticket" }, 401);
+  }
+
+  const ticketKey = `console-ticket:${ticket}`;
+  const ticketData = await c.env.KV.get(ticketKey);
+  if (!ticketData) {
+    return c.json({ error: "Invalid or expired ticket" }, 401);
+  }
+
+  await c.env.KV.delete(ticketKey);
+
+  const data = JSON.parse(ticketData) as {
+    serverId: string;
+    serverUuid: string;
+    userId: string;
+    wingsUrl: string;
+    wingsToken: string;
+  };
+
+  if (data.serverId !== c.req.param("id")) {
+    return c.json({ error: "Ticket/server mismatch" }, 403);
+  }
+
+  const doId = c.env.CONSOLE_SESSION.idFromName(data.serverUuid);
+  const stub = c.env.CONSOLE_SESSION.get(doId);
+
+  // Forward the original WebSocket upgrade request to the DO.
+  const connectUrl = new URL("https://internal/connect");
+  connectUrl.searchParams.set("wingsUrl", data.wingsUrl);
+  connectUrl.searchParams.set("wingsToken", data.wingsToken);
+  connectUrl.searchParams.set("userId", data.userId);
+  connectUrl.searchParams.set("serverId", data.serverId);
+
+  return stub.fetch(new Request(connectUrl.toString(), c.req.raw));
+});
+
+// Sub-routers (these apply their own auth middleware)
 apiRoutes.route("/auth", authRoutes);
 apiRoutes.route("/nodes", nodeRoutes);
 apiRoutes.route("/servers", serverRoutes);

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { StatCard } from "@web/components/stat-card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,7 @@ import {
   TabsTrigger,
 } from "@web/components/ui/tabs";
 import { api } from "@web/lib/api";
+import { formatBytes } from "@web/lib/format";
 import {
   ArrowLeft,
   ChevronRight,
@@ -439,15 +441,14 @@ function FilesTab({ serverId }: { serverId: string }) {
       file: string;
       content: string;
     }) => {
-      const token = localStorage.getItem("session_token");
       const res = await fetch(
         `/api/servers/${serverId}/files/write?file=${encodeURIComponent(file)}`,
         {
           method: "POST",
           headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "text/plain",
           },
+          credentials: "include",
           body: content,
         }
       );
@@ -480,11 +481,10 @@ function FilesTab({ serverId }: { serverId: string }) {
     setLoadingFile(true);
     setSaveStatus("");
     try {
-      const token = localStorage.getItem("session_token");
       const res = await fetch(
         `/api/servers/${serverId}/files/contents?file=${encodeURIComponent(filePath)}`,
         {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
         }
       );
       if (!res.ok) {
@@ -726,36 +726,4 @@ function SettingsTab({
       </CardContent>
     </Card>
   );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="text-primary">{icon}</div>
-        <div>
-          <div className="text-muted-foreground text-xs">{label}</div>
-          <div className="font-medium text-sm">{value}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) {
-    return "0 B";
-  }
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / k ** i).toFixed(1)} ${sizes[i]}`;
 }

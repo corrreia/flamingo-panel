@@ -1,12 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
 
-interface ConnectParams {
-  serverId: string;
-  userId: string;
-  wingsToken: string;
-  wingsUrl: string;
-}
-
 export class ConsoleSession extends DurableObject {
   private wingsSocket: WebSocket | null = null;
   private buffer: string[] = [];
@@ -28,18 +21,26 @@ export class ConsoleSession extends DurableObject {
     });
   }
 
+  // biome-ignore lint/suspicious/useAwait: DO fetch handler must be async
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/connect" && request.method === "POST") {
-      const params = (await request.json()) as ConnectParams;
+    if (url.pathname === "/connect") {
+      if (request.headers.get("Upgrade") !== "websocket") {
+        return new Response("Expected WebSocket upgrade", { status: 426 });
+      }
+
+      const wingsUrl = url.searchParams.get("wingsUrl") ?? "";
+      const wingsToken = url.searchParams.get("wingsToken") ?? "";
+      const userId = url.searchParams.get("userId") ?? "";
+      const serverId = url.searchParams.get("serverId") ?? "";
 
       // Accept the WebSocket from the client side of the pair
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
       // Tag with user info for identification
-      this.ctx.acceptWebSocket(server, [params.userId, params.serverId]);
+      this.ctx.acceptWebSocket(server, [userId, serverId]);
 
       // Send buffered lines to the new client immediately
       for (const line of this.buffer) {
@@ -48,13 +49,13 @@ export class ConsoleSession extends DurableObject {
 
       // Connect to Wings if not already connected
       if (!this.wingsSocket || this.wingsSocket.readyState !== WebSocket.OPEN) {
-        this.connectToWings(params.wingsUrl, params.wingsToken);
+        this.connectToWings(wingsUrl, wingsToken);
       }
 
       // Log the connection
       this.ctx.storage.sql.exec(
         "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
-        params.userId,
+        userId,
         "console.connect",
         null
       );
