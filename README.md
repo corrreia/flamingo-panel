@@ -81,6 +81,11 @@ Set `PANEL_URL` in `wrangler.jsonc` to the URL where your panel is reachable (e.
 | `bun run db:migrate:dev` | Apply migrations locally |
 | `bun run db:migrate:prod` | Apply migrations to production |
 | `bun run db:studio` | Open Drizzle Studio |
+| `bun run studio` | Local Drizzle Studio via localflare |
+| `bun run test` | Run Vitest tests |
+| `bun run lint` | Biome lint |
+| `bun run format` | Biome auto-format |
+| `bun run check` | Biome check with auto-fix |
 
 ## License
 
