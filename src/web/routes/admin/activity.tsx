@@ -26,17 +26,17 @@ import { ArrowLeft, ClipboardList, X } from "lucide-react";
 import { useState } from "react";
 
 interface ActivityEntry {
-  id: number;
-  event: string;
-  metadata: string | null;
-  ip: string | null;
   createdAt: string;
-  userId: string | null;
-  userName: string | null;
-  serverId: string | null;
-  serverName: string | null;
+  event: string;
+  id: number;
+  ip: string | null;
+  metadata: string | null;
   nodeId: number | null;
   nodeName: string | null;
+  serverId: string | null;
+  serverName: string | null;
+  userId: string | null;
+  userName: string | null;
 }
 
 interface ActivityResponse {
@@ -55,9 +55,9 @@ interface NodeItem {
 }
 
 interface UserItem {
+  email: string;
   id: string;
   username: string;
-  email: string;
 }
 
 export const Route = createFileRoute("/admin/activity")({
@@ -91,15 +91,22 @@ function ActivityLogPage() {
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("per_page", "50");
-  if (serverId) { params.set("server_id", serverId); }
-  if (nodeId) { params.set("node_id", nodeId); }
-  if (userId) { params.set("user_id", userId); }
-  if (event) { params.set("event", event); }
+  if (serverId) {
+    params.set("server_id", serverId);
+  }
+  if (nodeId) {
+    params.set("node_id", nodeId);
+  }
+  if (userId) {
+    params.set("user_id", userId);
+  }
+  if (event) {
+    params.set("event", event);
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-activity", page, serverId, nodeId, userId, event],
-    queryFn: () =>
-      api.get<ActivityResponse>(`/activity?${params.toString()}`),
+    queryFn: () => api.get<ActivityResponse>(`/activity?${params.toString()}`),
   });
 
   const hasFilters = serverId || nodeId || userId || event;
@@ -127,8 +134,11 @@ function ActivityLogPage() {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <Select
+            onValueChange={(v) => {
+              setServerId(v);
+              setPage(0);
+            }}
             value={serverId}
-            onValueChange={(v) => { setServerId(v); setPage(0); }}
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All servers" />
@@ -143,8 +153,11 @@ function ActivityLogPage() {
           </Select>
 
           <Select
+            onValueChange={(v) => {
+              setNodeId(v);
+              setPage(0);
+            }}
             value={nodeId}
-            onValueChange={(v) => { setNodeId(v); setPage(0); }}
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All nodes" />
@@ -159,8 +172,11 @@ function ActivityLogPage() {
           </Select>
 
           <Select
+            onValueChange={(v) => {
+              setUserId(v);
+              setPage(0);
+            }}
             value={userId}
-            onValueChange={(v) => { setUserId(v); setPage(0); }}
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All users" />
@@ -176,13 +192,16 @@ function ActivityLogPage() {
 
           <Input
             className="w-48"
+            onChange={(e) => {
+              setEvent(e.target.value);
+              setPage(0);
+            }}
             placeholder="Filter by event..."
             value={event}
-            onChange={(e) => { setEvent(e.target.value); setPage(0); }}
           />
 
           {hasFilters && (
-            <Button size="sm" variant="ghost" onClick={clearFilters}>
+            <Button onClick={clearFilters} size="sm" variant="ghost">
               <X className="mr-1 h-4 w-4" /> Clear
             </Button>
           )}
@@ -212,7 +231,7 @@ function ActivityLogPage() {
                 {data?.data.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell>
-                      <Badge variant="secondary" className="font-mono text-xs">
+                      <Badge className="font-mono text-xs" variant="secondary">
                         {entry.event}
                       </Badge>
                     </TableCell>
@@ -220,8 +239,8 @@ function ActivityLogPage() {
                       {entry.serverName ? (
                         <Link
                           className="text-primary hover:underline"
+                          params={{ serverId: entry.serverId ?? "" }}
                           to="/server/$serverId"
-                          params={{ serverId: entry.serverId! }}
                         >
                           {entry.serverName}
                         </Link>
@@ -265,20 +284,18 @@ function ActivityLogPage() {
                 </span>
                 <div className="flex gap-2">
                   <Button
-                    size="sm"
-                    variant="outline"
                     disabled={page === 0}
                     onClick={() => setPage((p) => p - 1)}
+                    size="sm"
+                    variant="outline"
                   >
                     Previous
                   </Button>
                   <Button
+                    disabled={(page + 1) * data.meta.perPage >= data.meta.total}
+                    onClick={() => setPage((p) => p + 1)}
                     size="sm"
                     variant="outline"
-                    disabled={
-                      (page + 1) * data.meta.perPage >= data.meta.total
-                    }
-                    onClick={() => setPage((p) => p + 1)}
                   >
                     Next
                   </Button>
