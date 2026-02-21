@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   AlertDialog,
@@ -44,7 +46,6 @@ import {
 import { Textarea } from "@web/components/ui/textarea";
 import { api } from "@web/lib/api";
 import {
-  ArrowLeft,
   ChevronDown,
   ChevronRight,
   Download,
@@ -102,13 +103,11 @@ function renderEggsList(eggs: EggItem[] | undefined, isLoading: boolean) {
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <Egg className="mb-4 h-12 w-12 text-primary/30" />
-        <p>No eggs configured yet.</p>
-        <p className="text-sm">Import a Pelican egg or create one manually.</p>
-      </CardContent>
-    </Card>
+    <EmptyState
+      description="Import a Pelican egg or create one manually."
+      icon={Egg}
+      title="No eggs configured yet."
+    />
   );
 }
 
@@ -226,74 +225,73 @@ function EggsPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <h1 className="font-bold text-2xl">Eggs</h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Dialog onOpenChange={setImportOpen} open={importOpen}>
-              <DialogTrigger asChild>
-                <Button variant="secondary">
-                  <Upload className="mr-2 h-4 w-4" /> Import Egg
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Import Egg</DialogTitle>
-                  <DialogDescription>
-                    Supports Pelican (PLCN v1-v3) and Pterodactyl (PTDL v1-v2)
-                    egg formats. Paste JSON or upload a file.
-                  </DialogDescription>
-                </DialogHeader>
-                <form className="space-y-4" onSubmit={handleImport}>
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="egg-file">Upload JSON file</Label>
-                    <Input
-                      accept=".json"
-                      id="egg-file"
-                      onChange={handleFileUpload}
-                      type="file"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="egg-json">Or paste JSON</Label>
-                    <Textarea
-                      className="h-64 font-mono text-xs"
-                      id="egg-json"
-                      onChange={(e) => setImportJson(e.target.value)}
-                      placeholder='{"name": "Minecraft", ...}'
-                      value={importJson}
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      disabled={importMutation.isPending || !importJson.trim()}
-                      type="submit"
-                    >
-                      {importMutation.isPending ? "Importing..." : "Import Egg"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Button asChild>
-              <Link to="/admin/eggs/create">
-                <Plus className="mr-2 h-4 w-4" /> Create Egg
-              </Link>
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          actions={
+            <>
+              <Dialog onOpenChange={setImportOpen} open={importOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary">
+                    <Upload className="mr-2 h-4 w-4" /> Import Egg
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Import Egg</DialogTitle>
+                    <DialogDescription>
+                      Supports Pelican (PLCN v1-v3) and Pterodactyl (PTDL v1-v2)
+                      egg formats. Paste JSON or upload a file.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form className="space-y-4" onSubmit={handleImport}>
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="egg-file">Upload JSON file</Label>
+                      <Input
+                        accept=".json"
+                        id="egg-file"
+                        onChange={handleFileUpload}
+                        type="file"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="egg-json">Or paste JSON</Label>
+                      <Textarea
+                        className="h-64 font-mono text-xs"
+                        id="egg-json"
+                        onChange={(e) => setImportJson(e.target.value)}
+                        placeholder='{"name": "Minecraft", ...}'
+                        value={importJson}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        disabled={
+                          importMutation.isPending || !importJson.trim()
+                        }
+                        type="submit"
+                      >
+                        {importMutation.isPending
+                          ? "Importing..."
+                          : "Import Egg"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              <Button asChild>
+                <Link to="/admin/eggs/create">
+                  <Plus className="mr-2 h-4 w-4" /> Create Egg
+                </Link>
+              </Button>
+            </>
+          }
+          backTo="/"
+          title="Eggs"
+        />
 
         {renderEggsList(eggs, isLoading)}
       </div>

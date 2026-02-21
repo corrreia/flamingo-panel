@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
 import { Badge } from "@web/components/ui/badge";
 import {
@@ -58,7 +59,7 @@ function EggsPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <h1 className="font-bold text-2xl">Eggs</h1>
+        <h1 className="font-bold text-2xl tracking-tight">Eggs</h1>
 
         {isLoading ? (
           <div className="space-y-3">
@@ -73,12 +74,7 @@ function EggsPage() {
             ))}
           </div>
         ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Egg className="mb-4 h-12 w-12 text-primary/30" />
-              <p>No eggs available yet.</p>
-            </CardContent>
-          </Card>
+          <EmptyState icon={Egg} title="No eggs available yet." />
         )}
       </div>
     </Layout>

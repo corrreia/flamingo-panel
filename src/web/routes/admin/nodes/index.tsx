@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
 import { StatCard } from "@web/components/stat-card";
+import { StatusDot } from "@web/components/status-dot";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
-import { Card, CardContent } from "@web/components/ui/card";
+import { Card } from "@web/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +32,6 @@ import { type Utilization, useNodeMetrics } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
 import {
-  ArrowLeft,
   Check,
   Copy,
   Cpu,
@@ -99,9 +101,7 @@ function NodeRow({
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${metrics.wingsOnline ? "bg-green-500" : "bg-gray-400"}`}
-          />
+          <StatusDot status={metrics.wingsOnline ? "online" : "offline"} />
           <Link
             className="font-medium hover:underline"
             params={{ nodeId: String(node.id) }}
@@ -167,9 +167,15 @@ function NodesList({
               <TableHead className="w-12">#</TableHead>
               <TableHead>Name</TableHead>
               <TableHead className="hidden md:table-cell">Wings URL</TableHead>
-              <TableHead className="hidden text-right md:table-cell">CPU</TableHead>
-              <TableHead className="hidden text-right md:table-cell">Memory</TableHead>
-              <TableHead className="hidden text-right md:table-cell">Disk</TableHead>
+              <TableHead className="hidden text-right md:table-cell">
+                CPU
+              </TableHead>
+              <TableHead className="hidden text-right md:table-cell">
+                Memory
+              </TableHead>
+              <TableHead className="hidden text-right md:table-cell">
+                Disk
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -183,13 +189,11 @@ function NodesList({
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <Network className="mb-4 h-12 w-12 text-primary/30" />
-        <p>No nodes configured yet.</p>
-        <p className="text-sm">Add a Wings node to get started.</p>
-      </CardContent>
-    </Card>
+    <EmptyState
+      description="Add a Wings node to get started."
+      icon={Network}
+      title="No nodes configured yet."
+    />
   );
 }
 
@@ -285,65 +289,62 @@ function NodesPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <h1 className="font-bold text-2xl">Nodes</h1>
-          </div>
-          <Dialog onOpenChange={setDialogOpen} open={dialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> Add Node
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Node</DialogTitle>
-                <DialogDescription>
-                  Create a node to get the <code>wings configure</code> command.
-                </DialogDescription>
-              </DialogHeader>
-              <form className="space-y-4" onSubmit={handleCreate}>
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="node-name">Name</Label>
-                  <Input
-                    id="node-name"
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="US East 1"
-                    required
-                    value={name}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="node-url">Wings URL (optional)</Label>
-                  <Input
-                    id="node-url"
-                    onChange={(e) => setNodeUrl(e.target.value)}
-                    placeholder="https://wings-node1.example.com"
-                    value={nodeUrl}
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    Full URL including protocol and port.
-                  </p>
-                </div>
-                <DialogFooter>
-                  <Button disabled={createMutation.isPending} type="submit">
-                    {createMutation.isPending ? "Creating..." : "Create Node"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <PageHeader
+          actions={
+            <Dialog onOpenChange={setDialogOpen} open={dialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" /> Add Node
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Node</DialogTitle>
+                  <DialogDescription>
+                    Create a node to get the <code>wings configure</code>{" "}
+                    command.
+                  </DialogDescription>
+                </DialogHeader>
+                <form className="space-y-4" onSubmit={handleCreate}>
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="node-name">Name</Label>
+                    <Input
+                      id="node-name"
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="US East 1"
+                      required
+                      value={name}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="node-url">Wings URL (optional)</Label>
+                    <Input
+                      id="node-url"
+                      onChange={(e) => setNodeUrl(e.target.value)}
+                      placeholder="https://wings-node1.example.com"
+                      value={nodeUrl}
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      Full URL including protocol and port.
+                    </p>
+                  </div>
+                  <DialogFooter>
+                    <Button disabled={createMutation.isPending} type="submit">
+                      {createMutation.isPending ? "Creating..." : "Create Node"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          }
+          backTo="/"
+          title="Nodes"
+        />
 
         <Dialog onOpenChange={setResultDialogOpen} open={resultDialogOpen}>
           <DialogContent className="max-w-lg">

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
 import { Badge } from "@web/components/ui/badge";
 import {
@@ -35,7 +36,7 @@ function DashboardPage() {
   return (
     <Layout>
       <div className="space-y-4">
-        <h1 className="font-bold text-2xl">Your Servers</h1>
+        <h1 className="font-bold text-2xl tracking-tight">Your Servers</h1>
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
@@ -85,12 +86,11 @@ function DashboardPage() {
               </Link>
             ))}
             {servers?.length === 0 && (
-              <Card className="col-span-full">
-                <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <Server className="mb-4 h-12 w-12 text-primary/30" />
-                  <p>No servers yet.</p>
-                </CardContent>
-              </Card>
+              <EmptyState
+                className="col-span-full"
+                icon={Server}
+                title="No servers yet."
+              />
             )}
           </div>
         )}

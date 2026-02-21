@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
+import { TablePagination } from "@web/components/table-pagination";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { Card } from "@web/components/ui/card";
@@ -22,7 +24,7 @@ import {
   TableRow,
 } from "@web/components/ui/table";
 import { api } from "@web/lib/api";
-import { ArrowLeft, ClipboardList, X } from "lucide-react";
+import { ClipboardList, X } from "lucide-react";
 import { useState } from "react";
 
 interface ActivityEntry {
@@ -122,14 +124,7 @@ function ActivityLogPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="font-bold text-2xl">Activity Log</h1>
-        </div>
+        <PageHeader backTo="/" title="Activity Log" />
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
@@ -265,7 +260,7 @@ function ActivityLogPage() {
                 {data?.data.length === 0 && (
                   <TableRow>
                     <TableCell
-                      className="py-8 text-center text-muted-foreground"
+                      className="py-16 text-center text-muted-foreground"
                       colSpan={6}
                     >
                       <ClipboardList className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
@@ -276,31 +271,13 @@ function ActivityLogPage() {
               </TableBody>
             </Table>
 
-            {data && data.meta.total > data.meta.perPage && (
-              <div className="flex flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-muted-foreground text-sm">
-                  {data.meta.total} entries — Page {data.meta.page + 1} of{" "}
-                  {Math.ceil(data.meta.total / data.meta.perPage)}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => p - 1)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    disabled={(page + 1) * data.meta.perPage >= data.meta.total}
-                    onClick={() => setPage((p) => p + 1)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+            {data && (
+              <TablePagination
+                onPageChange={setPage}
+                page={page}
+                perPage={data.meta.perPage}
+                total={data.meta.total}
+              />
             )}
           </Card>
         )}
