@@ -102,6 +102,8 @@ function ServerPage() {
     );
   }
 
+  const canManage = server.role === "owner" || server.role === "admin";
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -158,15 +160,19 @@ function ServerPage() {
               <TabsTrigger value="files">
                 <FolderOpen className="mr-2 h-4 w-4" /> Files
               </TabsTrigger>
-              <TabsTrigger value="settings">
-                <Settings className="mr-2 h-4 w-4" /> Settings
-              </TabsTrigger>
+              {canManage && (
+                <TabsTrigger value="settings">
+                  <Settings className="mr-2 h-4 w-4" /> Settings
+                </TabsTrigger>
+              )}
               <TabsTrigger value="activity">
                 <ClipboardList className="mr-2 h-4 w-4" /> Activity
               </TabsTrigger>
-              <TabsTrigger value="users">
-                <Users className="mr-2 h-4 w-4" /> Users
-              </TabsTrigger>
+              {canManage && (
+                <TabsTrigger value="users">
+                  <Users className="mr-2 h-4 w-4" /> Users
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
           <TabsContent value="console">
@@ -175,15 +181,19 @@ function ServerPage() {
           <TabsContent value="files">
             <FilesTab serverId={server.id} />
           </TabsContent>
-          <TabsContent value="settings">
-            <SettingsTab serverId={server.id} serverName={server.name} />
-          </TabsContent>
+          {canManage && (
+            <TabsContent value="settings">
+              <SettingsTab serverId={server.id} serverName={server.name} />
+            </TabsContent>
+          )}
           <TabsContent value="activity">
             <ActivityTab serverId={server.id} />
           </TabsContent>
-          <TabsContent value="users">
-            <UsersTab serverId={server.id} />
-          </TabsContent>
+          {canManage && (
+            <TabsContent value="users">
+              <UsersTab serverId={server.id} />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </Layout>
