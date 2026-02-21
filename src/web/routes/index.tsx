@@ -19,6 +19,7 @@ interface ServerItem {
   id: string;
   memory: number;
   name: string;
+  role: "admin" | "owner" | "subuser";
   status: string | null;
   uuid: string;
 }
@@ -67,6 +68,11 @@ function DashboardPage() {
                       >
                         {s.status || "Active"}
                       </Badge>
+                      {s.role === "subuser" && (
+                        <Badge className="text-xs" variant="outline">
+                          Shared
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
