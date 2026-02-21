@@ -183,7 +183,7 @@ export function FilesTab({ serverId }: { serverId: string }) {
                 </Badge>
               )}
               {saveStatus === "saved" && (
-                <Badge className="text-green-500 text-xs" variant="secondary">
+                <Badge className="text-xs" variant="secondary">
                   Saved
                 </Badge>
               )}
