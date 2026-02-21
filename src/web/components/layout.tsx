@@ -61,8 +61,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Server className="mr-2 h-4 w-4" /> Servers
               </Link>
             </Button>
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/eggs">
+                <Egg className="mr-2 h-4 w-4" /> Eggs
+              </Link>
+            </Button>
             {user?.role === "admin" && (
               <>
+                <div className="mx-1 h-4 w-px bg-border" />
+                <span className="mr-1 text-muted-foreground text-xs">Admin</span>
                 <Button asChild size="sm" variant="ghost">
                   <Link to="/admin/nodes">
                     <Network className="mr-2 h-4 w-4" /> Nodes
@@ -147,8 +154,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Server className="mr-2 h-4 w-4" /> Servers
               </Link>
             </Button>
+            <Button asChild className="justify-start" size="sm" variant="ghost">
+              <Link to="/eggs">
+                <Egg className="mr-2 h-4 w-4" /> Eggs
+              </Link>
+            </Button>
             {user?.role === "admin" && (
               <>
+                <div className="my-2 border-border border-t" />
+                <span className="mb-1 px-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Admin</span>
                 <Button
                   asChild
                   className="justify-start"
