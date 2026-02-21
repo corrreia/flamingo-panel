@@ -105,6 +105,8 @@ serverRoutes.post(
         defaultAllocationPort: data.defaultAllocationPort,
         startup: data.startup || egg.startup,
         image: data.image || egg.dockerImage,
+        status: "installing",
+        containerStatus: "offline",
       })
       .returning()
       .get();
@@ -142,8 +144,25 @@ serverRoutes.post(
     try {
       const client = new WingsClient(node);
       await client.createServer(buildInstallPayload(server, egg, environment));
-    } catch {
-      // Wings might be offline, server record is still created
+    } catch (err) {
+      await db
+        .update(schema.servers)
+        .set({
+          status: "install_failed",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(schema.servers.id, server.id));
+
+      logActivity(c, {
+        event: "server:create",
+        serverId: server.id,
+        nodeId: data.nodeId,
+        metadata: {
+          name: data.name,
+          wingsError: err instanceof Error ? err.message : "Wings offline",
+        },
+      });
+      return c.json({ ...server, status: "install_failed" }, 201);
     }
 
     logActivity(c, {
@@ -265,6 +284,15 @@ serverRoutes.post("/:id/reinstall", async (c) => {
     .all();
 
   const environment = buildServerEnvironment(server, eggVars, serverVars);
+
+  await db
+    .update(schema.servers)
+    .set({
+      status: "installing",
+      containerStatus: "offline",
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(schema.servers.id, server.id));
 
   const client = new WingsClient(node);
   await client.createServer(buildInstallPayload(server, egg, environment));

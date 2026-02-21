@@ -71,13 +71,31 @@ export function buildInstallPayload(
       mounts: [],
       egg: {
         id: egg.id,
-        file_denylist: JSON.parse(egg.fileDenylist || "[]"),
+        file_denylist: (() => {
+          try {
+            return JSON.parse(egg.fileDenylist || "[]");
+          } catch {
+            return [];
+          }
+        })(),
       },
     },
     process_configuration: {
-      startup: JSON.parse(egg.configStartup || "{}"),
+      startup: (() => {
+        try {
+          return JSON.parse(egg.configStartup || "{}");
+        } catch {
+          return {};
+        }
+      })(),
       stop: { type: "command", value: egg.stopCommand },
-      configs: JSON.parse(egg.configFiles || "[]"),
+      configs: (() => {
+        try {
+          return JSON.parse(egg.configFiles || "[]");
+        } catch {
+          return [];
+        }
+      })(),
     },
   };
 }
@@ -124,16 +142,37 @@ export function buildBootConfig(
       crash_detection_enabled: true,
     }),
     process_configuration: JSON.stringify({
-      startup: {
-        done: egg ? JSON.parse(egg.configStartup || "{}").done || [] : [],
-        user_interaction: [],
-        strip_ansi: false,
-      },
+      startup: (() => {
+        let raw: unknown = [];
+        try {
+          const parsed = JSON.parse(egg?.configStartup || "{}");
+          raw = parsed.done ?? [];
+        } catch {
+          // Invalid JSON — use empty done list
+        }
+        let done: unknown[] = [];
+        if (typeof raw === "string") {
+          done = [raw];
+        } else if (Array.isArray(raw)) {
+          done = raw;
+        }
+        return {
+          done,
+          user_interaction: [],
+          strip_ansi: false,
+        };
+      })(),
       stop: {
         type: "command",
         value: egg?.stopCommand || "stop",
       },
-      configs: egg ? JSON.parse(egg.configFiles || "[]") : [],
+      configs: (() => {
+        try {
+          return JSON.parse(egg?.configFiles || "[]");
+        } catch {
+          return [];
+        }
+      })(),
     }),
   };
 }

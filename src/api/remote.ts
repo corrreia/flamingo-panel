@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
 import {
@@ -59,6 +59,12 @@ remoteRoutes.get("/servers", async (c) => {
     .offset(offset)
     .all();
 
+  const totalCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.servers)
+    .where(eq(schema.servers.nodeId, node.id))
+    .get();
+
   const data = await Promise.all(
     servers.map(async (s) => {
       const egg = s.eggId
@@ -93,10 +99,10 @@ remoteRoutes.get("/servers", async (c) => {
     meta: {
       current_page: page,
       from: offset,
-      last_page: Math.ceil(servers.length / perPage),
+      last_page: Math.ceil((totalCount?.count ?? 0) / perPage),
       per_page: perPage,
       to: offset + data.length,
-      total: servers.length,
+      total: totalCount?.count ?? 0,
     },
   });
 });
@@ -149,6 +155,7 @@ remoteRoutes.post("/servers/:uuid/install", async (c) => {
     .update(schema.servers)
     .set({
       status: body.successful ? null : "install_failed",
+      containerStatus: "offline",
       installedAt: body.successful
         ? new Date().toISOString()
         : server.installedAt,
@@ -159,13 +166,52 @@ remoteRoutes.post("/servers/:uuid/install", async (c) => {
   return c.body(null, 204);
 });
 
-// POST /api/remote/servers/reset - Wings reports boot
-remoteRoutes.post("/servers/reset", (_c) => {
-  return _c.body(null, 204);
+// POST /api/remote/servers/reset - Wings reports boot, clear stuck states
+remoteRoutes.post("/servers/reset", async (c) => {
+  const node = c.get("node");
+  const db = getDb(c.env.DB);
+
+  await db
+    .update(schema.servers)
+    .set({
+      status: null,
+      containerStatus: "offline",
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(schema.servers.nodeId, node.id));
+
+  return c.body(null, 204);
 });
 
 // POST /api/remote/servers/:uuid/container/status - Wings reports state change
-remoteRoutes.post("/servers/:uuid/container/status", (c) => {
+remoteRoutes.post("/servers/:uuid/container/status", async (c) => {
+  const db = getDb(c.env.DB);
+  const body = (await c.req.json()) as {
+    data: { previous_state: string; new_state: string };
+  };
+  const newState = body.data?.new_state;
+  if (!newState) {
+    return c.body(null, 204);
+  }
+
+  const server = await db
+    .select({ id: schema.servers.id })
+    .from(schema.servers)
+    .where(eq(schema.servers.uuid, c.req.param("uuid")))
+    .get();
+
+  if (!server) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  await db
+    .update(schema.servers)
+    .set({
+      containerStatus: newState,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(schema.servers.id, server.id));
+
   return c.body(null, 204);
 });
 

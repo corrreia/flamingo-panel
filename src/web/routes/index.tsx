@@ -14,6 +14,7 @@ import { api } from "@web/lib/api";
 import { Cpu, HardDrive, MemoryStick, Server } from "lucide-react";
 
 interface ServerItem {
+  containerStatus: string | null;
   cpu: number;
   disk: number;
   id: string;
@@ -28,10 +29,33 @@ export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
 
+function getStatusVariant(
+  s: ServerItem
+): "default" | "destructive" | "secondary" {
+  if (s.containerStatus === "running") {
+    return "default";
+  }
+  if (s.status === "install_failed") {
+    return "destructive";
+  }
+  return "secondary";
+}
+
+function getStatusLabel(s: ServerItem): string {
+  if (s.status === "installing") {
+    return "Installing";
+  }
+  if (s.status === "install_failed") {
+    return "Install Failed";
+  }
+  return s.containerStatus || "offline";
+}
+
 function DashboardPage() {
   const { data: servers, isLoading } = useQuery({
     queryKey: ["servers"],
     queryFn: () => api.get<ServerItem[]>("/servers"),
+    refetchInterval: 15_000,
   });
 
   return (
@@ -69,10 +93,8 @@ function DashboardPage() {
                             Shared
                           </Badge>
                         )}
-                        <Badge
-                          variant={s.status === null ? "default" : "secondary"}
-                        >
-                          {s.status || "Active"}
+                        <Badge variant={getStatusVariant(s)}>
+                          {getStatusLabel(s)}
                         </Badge>
                       </div>
                     </div>

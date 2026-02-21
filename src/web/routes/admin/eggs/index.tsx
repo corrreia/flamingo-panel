@@ -76,8 +76,12 @@ function EggsPage() {
   });
 
   const filtered = useMemo(() => {
-    if (!eggs) return [];
-    if (!search.trim()) return eggs;
+    if (!eggs) {
+      return [];
+    }
+    if (!search.trim()) {
+      return eggs;
+    }
     const q = search.toLowerCase();
     return eggs.filter((egg) => {
       const tags = parseTags(egg.tags);
@@ -102,7 +106,7 @@ function EggsPage() {
     },
     onError: (err: Error) =>
       setError(
-        err.message === "Unexpected token" ? "Invalid JSON" : err.message,
+        err.message === "Unexpected token" ? "Invalid JSON" : err.message
       ),
   });
 
@@ -114,7 +118,9 @@ function EggsPage() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => setImportJson(ev.target?.result as string);
     reader.readAsText(file);
@@ -185,7 +191,9 @@ function EggsPage() {
                         }
                         type="submit"
                       >
-                        {importMutation.isPending ? "Importing..." : "Import Egg"}
+                        {importMutation.isPending
+                          ? "Importing..."
+                          : "Import Egg"}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -219,7 +227,7 @@ function EggsPage() {
         <EggsList
           eggs={filtered}
           isLoading={isLoading}
-          onDelete={(id) => {
+          onDelete={() => {
             queryClient.invalidateQueries({ queryKey: ["eggs"] });
           }}
           onExport={handleExport}

@@ -91,6 +91,7 @@ export const servers = sqliteTable(
       .default(25_565),
     additionalAllocations: text("additional_allocations").default("[]"),
     status: text("status"),
+    containerStatus: text("container_status").default("offline"),
     installedAt: text("installed_at"),
     ...timestamps,
   },

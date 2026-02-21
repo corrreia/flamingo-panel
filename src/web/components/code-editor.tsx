@@ -29,13 +29,12 @@ export function CodeEditor({
   } | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      import("react-simple-code-editor"),
-      import("prismjs"),
-    ]).then(async ([editorMod, prismMod]) => {
-      await languageModules[language]();
-      setEditor({ Editor: editorMod.default, Prism: prismMod });
-    });
+    Promise.all([import("react-simple-code-editor"), import("prismjs")]).then(
+      async ([editorMod, prismMod]) => {
+        await languageModules[language]();
+        setEditor({ Editor: editorMod.default, Prism: prismMod });
+      }
+    );
   }, [language]);
 
   if (!editor) {
@@ -43,7 +42,7 @@ export function CodeEditor({
       <div
         className={cn(
           "rounded-md border border-input bg-transparent shadow-xs dark:bg-input/30",
-          className,
+          className
         )}
       >
         <textarea
@@ -63,7 +62,7 @@ export function CodeEditor({
     <div
       className={cn(
         "overflow-auto rounded-md border border-input bg-transparent shadow-xs dark:bg-input/30",
-        className,
+        className
       )}
     >
       <Ed

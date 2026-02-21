@@ -49,6 +49,7 @@ import {
 import { useState } from "react";
 
 interface ServerDetail {
+  containerStatus: string | null;
   cpu: number;
   disk: number;
   id: string;
@@ -75,12 +76,35 @@ export const Route = createFileRoute("/server/$serverId")({
   component: ServerPage,
 });
 
+function getStatusVariant(
+  s: ServerDetail
+): "default" | "destructive" | "secondary" {
+  if (s.containerStatus === "running" || s.resources?.state === "running") {
+    return "default";
+  }
+  if (s.status === "install_failed") {
+    return "destructive";
+  }
+  return "secondary";
+}
+
+function getStatusLabel(s: ServerDetail): string {
+  if (s.status === "installing") {
+    return "Installing";
+  }
+  if (s.status === "install_failed") {
+    return "Install Failed";
+  }
+  return s.containerStatus || s.resources?.state || "offline";
+}
+
 function ServerPage() {
   const { serverId } = Route.useParams();
 
   const { data: server, isLoading } = useQuery({
     queryKey: ["server", serverId],
     queryFn: () => api.get<ServerDetail>(`/servers/${serverId}`),
+    refetchInterval: 10_000,
   });
 
   if (isLoading) {
@@ -117,12 +141,8 @@ function ServerPage() {
           backTo="/"
           title={server.name}
         >
-          <Badge
-            variant={
-              server.resources?.state === "running" ? "default" : "secondary"
-            }
-          >
-            {server.resources?.state || server.status || "offline"}
+          <Badge variant={getStatusVariant(server)}>
+            {getStatusLabel(server)}
           </Badge>
         </PageHeader>
 

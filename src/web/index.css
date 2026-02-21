@@ -86,26 +86,69 @@
   }
 
   /* Prism syntax highlighting */
-  .token.property { color: hsl(210 80% 55%); }
-  .token.string { color: hsl(140 60% 40%); }
-  .token.number { color: hsl(30 80% 50%); }
-  .token.boolean { color: hsl(330 80% 60%); }
-  .token.null-value { color: hsl(var(--muted-foreground)); }
-  .token.punctuation { color: hsl(var(--muted-foreground)); }
-  .token.operator { color: hsl(var(--foreground)); }
-  .token.keyword { color: hsl(280 70% 55%); }
-  .token.function { color: hsl(210 80% 55%); }
-  .token.builtin { color: hsl(30 80% 50%); }
-  .token.comment { color: hsl(var(--muted-foreground)); font-style: italic; }
-  .token.variable { color: hsl(350 70% 55%); }
-  .token.shebang { color: hsl(var(--muted-foreground)); }
+  .token.property {
+    color: hsl(210 80% 55%);
+  }
+  .token.string {
+    color: hsl(140 60% 40%);
+  }
+  .token.number {
+    color: hsl(30 80% 50%);
+  }
+  .token.boolean {
+    color: hsl(330 80% 60%);
+  }
+  .token.null-value {
+    color: hsl(var(--muted-foreground));
+  }
+  .token.punctuation {
+    color: hsl(var(--muted-foreground));
+  }
+  .token.operator {
+    color: hsl(var(--foreground));
+  }
+  .token.keyword {
+    color: hsl(280 70% 55%);
+  }
+  .token.function {
+    color: hsl(210 80% 55%);
+  }
+  .token.builtin {
+    color: hsl(30 80% 50%);
+  }
+  .token.comment {
+    font-style: italic;
+    color: hsl(var(--muted-foreground));
+  }
+  .token.variable {
+    color: hsl(350 70% 55%);
+  }
+  .token.shebang {
+    color: hsl(var(--muted-foreground));
+  }
 
-  .dark .token.property { color: hsl(210 80% 70%); }
-  .dark .token.string { color: hsl(140 60% 65%); }
-  .dark .token.number { color: hsl(30 80% 65%); }
-  .dark .token.boolean { color: hsl(330 80% 70%); }
-  .dark .token.keyword { color: hsl(280 70% 75%); }
-  .dark .token.function { color: hsl(210 80% 70%); }
-  .dark .token.builtin { color: hsl(30 80% 65%); }
-  .dark .token.variable { color: hsl(350 70% 70%); }
+  .dark .token.property {
+    color: hsl(210 80% 70%);
+  }
+  .dark .token.string {
+    color: hsl(140 60% 65%);
+  }
+  .dark .token.number {
+    color: hsl(30 80% 65%);
+  }
+  .dark .token.boolean {
+    color: hsl(330 80% 70%);
+  }
+  .dark .token.keyword {
+    color: hsl(280 70% 75%);
+  }
+  .dark .token.function {
+    color: hsl(210 80% 70%);
+  }
+  .dark .token.builtin {
+    color: hsl(30 80% 65%);
+  }
+  .dark .token.variable {
+    color: hsl(350 70% 70%);
+  }
 }
