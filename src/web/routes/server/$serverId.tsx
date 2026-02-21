@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
@@ -9,7 +9,23 @@ import { PowerControls } from "@web/components/server/power-controls";
 import { SettingsTab } from "@web/components/server/settings-tab";
 import { StatCard } from "@web/components/stat-card";
 import { Badge } from "@web/components/ui/badge";
+import { Button } from "@web/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@web/components/ui/card";
+import { Input } from "@web/components/ui/input";
 import { Skeleton } from "@web/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@web/components/ui/table";
 import {
   Tabs,
   TabsContent,
@@ -26,8 +42,11 @@ import {
   MemoryStick,
   Settings,
   Terminal,
+  Trash2,
+  Users,
   Wifi,
 } from "lucide-react";
+import { useState } from "react";
 
 interface ServerDetail {
   cpu: number;
@@ -47,6 +66,7 @@ interface ServerDetail {
       state: string;
     };
   } | null;
+  role: "admin" | "owner" | "subuser";
   status: string | null;
   uuid: string;
 }
@@ -144,6 +164,9 @@ function ServerPage() {
               <TabsTrigger value="activity">
                 <ClipboardList className="mr-2 h-4 w-4" /> Activity
               </TabsTrigger>
+              <TabsTrigger value="users">
+                <Users className="mr-2 h-4 w-4" /> Users
+              </TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="console">
@@ -158,8 +181,133 @@ function ServerPage() {
           <TabsContent value="activity">
             <ActivityTab serverId={server.id} />
           </TabsContent>
+          <TabsContent value="users">
+            <UsersTab serverId={server.id} />
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
+  );
+}
+
+interface SubuserItem {
+  createdAt: string;
+  email: string;
+  id: string;
+  userId: string;
+  username: string;
+}
+
+function UsersTab({ serverId }: { serverId: string }) {
+  const queryClient = useQueryClient();
+  const [identifier, setIdentifier] = useState("");
+  const [error, setError] = useState("");
+
+  const { data: subusers, isLoading } = useQuery({
+    queryKey: ["server-subusers", serverId],
+    queryFn: () => api.get<SubuserItem[]>(`/servers/${serverId}/subusers`),
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (id: string) => {
+      const isEmail = id.includes("@");
+      return api.post(
+        `/servers/${serverId}/subusers`,
+        isEmail ? { email: id } : { username: id }
+      );
+    },
+    onSuccess: () => {
+      setIdentifier("");
+      setError("");
+      queryClient.invalidateQueries({
+        queryKey: ["server-subusers", serverId],
+      });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (subuserId: string) =>
+      api.delete(`/servers/${serverId}/subusers/${subuserId}`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ["server-subusers", serverId],
+      }),
+  });
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (identifier.trim()) {
+      addMutation.mutate(identifier.trim());
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Shared Users</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form className="flex gap-2" onSubmit={handleAdd}>
+          <Input
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="Email or username"
+            value={identifier}
+          />
+          <Button
+            disabled={addMutation.isPending || !identifier.trim()}
+            type="submit"
+          >
+            {addMutation.isPending ? "Adding..." : "Add"}
+          </Button>
+        </form>
+        {error && <p className="text-destructive text-sm">{error}</p>}
+        {isLoading && <Skeleton className="h-20" />}
+        {!isLoading && subusers?.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="hidden sm:table-cell">Added</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {subusers.map((su) => (
+                <TableRow key={su.id}>
+                  <TableCell className="font-medium">
+                    {su.username || "-"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {su.email}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground text-xs sm:table-cell">
+                    {new Date(su.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      className="text-destructive hover:text-destructive"
+                      disabled={removeMutation.isPending}
+                      onClick={() => removeMutation.mutate(su.id)}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : null}
+        {!(isLoading || subusers?.length) && (
+          <p className="py-4 text-center text-muted-foreground text-sm">
+            No users have been added to this server yet.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
