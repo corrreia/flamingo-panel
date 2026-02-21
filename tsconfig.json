@@ -13,8 +13,8 @@
       "@web/*": ["./src/web/*"],
       "@api/*": ["./src/api/*"]
     },
-    "types": ["@cloudflare/workers-types"]
+    "types": ["./worker-configuration.d.ts"]
   },
-  "include": ["src", "worker-configuration.d.ts"],
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }

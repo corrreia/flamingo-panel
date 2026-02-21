@@ -19,7 +19,6 @@
       "devDependencies": {
         "@biomejs/biome": "^2.4.3",
         "@cloudflare/vite-plugin": "^1.25.2",
-        "@cloudflare/workers-types": "^4.20260227.0",
         "@tailwindcss/vite": "^4.2.0",
         "@tanstack/react-query": "^5.90.21",
         "@tanstack/react-router": "^1.161.3",
