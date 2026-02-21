@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { TablePagination } from "@web/components/table-pagination";
 import { Badge } from "@web/components/ui/badge";
-import { Button } from "@web/components/ui/button";
 import {
   Card,
   CardContent,
@@ -99,31 +99,13 @@ export function ActivityTab({ serverId }: { serverId: string }) {
                 )}
               </TableBody>
             </Table>
-            {data && data.meta.total > data.meta.perPage && (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-muted-foreground text-sm">
-                  Page {data.meta.page + 1} of{" "}
-                  {Math.ceil(data.meta.total / data.meta.perPage)}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => p - 1)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    disabled={(page + 1) * data.meta.perPage >= data.meta.total}
-                    onClick={() => setPage((p) => p + 1)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+            {data && (
+              <TablePagination
+                onPageChange={setPage}
+                page={page}
+                perPage={data.meta.perPage}
+                total={data.meta.total}
+              />
             )}
           </>
         )}

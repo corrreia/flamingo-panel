@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
 import { ActivityTab } from "@web/components/server/activity-tab";
 import { ConsoleTab } from "@web/components/server/console-tab";
 import { FilesTab } from "@web/components/server/files-tab";
@@ -8,7 +9,6 @@ import { PowerControls } from "@web/components/server/power-controls";
 import { SettingsTab } from "@web/components/server/settings-tab";
 import { StatCard } from "@web/components/stat-card";
 import { Badge } from "@web/components/ui/badge";
-import { Button } from "@web/components/ui/button";
 import { Skeleton } from "@web/components/ui/skeleton";
 import {
   Tabs,
@@ -19,7 +19,6 @@ import {
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
 import {
-  ArrowLeft,
   ClipboardList,
   Cpu,
   FolderOpen,
@@ -86,27 +85,24 @@ function ServerPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <h1 className="font-bold text-2xl">{server.name}</h1>
-            <Badge
-              variant={
-                server.resources?.state === "running" ? "default" : "secondary"
-              }
-            >
-              {server.resources?.state || server.status || "offline"}
-            </Badge>
-          </div>
-          <PowerControls
-            serverId={server.id}
-            state={server.resources?.state || "offline"}
-          />
-        </div>
+        <PageHeader
+          actions={
+            <PowerControls
+              serverId={server.id}
+              state={server.resources?.state || "offline"}
+            />
+          }
+          backTo="/"
+          title={server.name}
+        >
+          <Badge
+            variant={
+              server.resources?.state === "running" ? "default" : "secondary"
+            }
+          >
+            {server.resources?.state || server.status || "offline"}
+          </Badge>
+        </PageHeader>
 
         {server.resources?.utilization && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">

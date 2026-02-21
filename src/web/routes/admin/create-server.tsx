@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import {
@@ -20,7 +21,7 @@ import {
 } from "@web/components/ui/select";
 import { Skeleton } from "@web/components/ui/skeleton";
 import { api } from "@web/lib/api";
-import { ArrowLeft, ChevronRight, Server } from "lucide-react";
+import { ChevronRight, Server } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface UserItem {
@@ -192,14 +193,7 @@ function CreateServerPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="font-bold text-2xl">Create Server</h1>
-        </div>
+        <PageHeader backTo="/" title="Create Server" />
 
         <div className="flex flex-wrap items-center gap-2">
           {steps.map((s, i) => (

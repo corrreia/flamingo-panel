@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import { Button } from "@web/components/ui/button";
 import { Card, CardContent } from "@web/components/ui/card";
@@ -14,7 +15,7 @@ import {
 } from "@web/components/ui/tabs";
 import { Textarea } from "@web/components/ui/textarea";
 import { api } from "@web/lib/api";
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useState } from "react";
 
 interface DockerImage {
@@ -206,14 +207,7 @@ function CreateEggPage() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/admin/eggs">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="font-bold text-2xl">Create Egg</h1>
-        </div>
+        <PageHeader backTo="/admin/eggs" title="Create Egg" />
 
         {/* Tabbed Form */}
         <Tabs defaultValue="configuration">

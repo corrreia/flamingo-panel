@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
+import { StatusDot } from "@web/components/status-dot";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   AlertDialog,
@@ -13,7 +15,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@web/components/ui/alert-dialog";
-import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import { Card, CardContent } from "@web/components/ui/card";
 import { Input } from "@web/components/ui/input";
@@ -30,7 +31,6 @@ import { useNodeMetrics } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
 import {
-  ArrowLeft,
   Box,
   Check,
   Copy,
@@ -41,8 +41,6 @@ import {
   Settings,
   Terminal,
   Trash2,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -187,11 +185,7 @@ function NodeDetailPage() {
     return (
       <Layout>
         <div className="space-y-4">
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/admin/nodes">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Nodes
-            </Link>
-          </Button>
+          <PageHeader backTo="/admin/nodes" title="Node not found" />
           <Alert variant="destructive">
             <AlertDescription>Node not found.</AlertDescription>
           </Alert>
@@ -206,34 +200,17 @@ function NodeDetailPage() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/admin/nodes">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2.5">
-              <h1 className="font-bold text-2xl">{node.name}</h1>
-              <Badge variant={isOnline ? "default" : "secondary"}>
-                {isOnline ? (
-                  <>
-                    <Wifi className="mr-1 h-3 w-3" /> Online
-                  </>
-                ) : (
-                  <>
-                    <WifiOff className="mr-1 h-3 w-3" /> Offline
-                  </>
-                )}
-              </Badge>
-            </div>
-            {node.url && (
-              <p className="truncate font-mono text-muted-foreground text-xs">
-                {node.url}
-              </p>
-            )}
-          </div>
-        </div>
+        <PageHeader backTo="/admin/nodes" title={node.name}>
+          <StatusDot
+            label={isOnline ? "Online" : "Offline"}
+            status={isOnline ? "online" : "offline"}
+          />
+        </PageHeader>
+        {node.url && (
+          <p className="-mt-4 truncate pl-12 font-mono text-muted-foreground text-xs">
+            {node.url}
+          </p>
+        )}
 
         {error && (
           <Alert variant="destructive">

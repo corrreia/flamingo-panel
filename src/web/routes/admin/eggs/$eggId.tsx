@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
+import { PageHeader } from "@web/components/page-header";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
 import {
   AlertDialog,
@@ -32,7 +33,7 @@ import {
 } from "@web/components/ui/tabs";
 import { Textarea } from "@web/components/ui/textarea";
 import { api } from "@web/lib/api";
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -317,14 +318,7 @@ function EditEggPage() {
     return (
       <Layout>
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/admin/eggs">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <h1 className="font-bold text-2xl">Edit Egg</h1>
-          </div>
+          <PageHeader backTo="/admin/eggs" title="Edit Egg" />
           <Alert variant="destructive">
             <AlertDescription>Egg not found.</AlertDescription>
           </Alert>
@@ -338,14 +332,10 @@ function EditEggPage() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/admin/eggs">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="font-bold text-2xl">Edit Egg &mdash; {egg.name}</h1>
-        </div>
+        <PageHeader
+          backTo="/admin/eggs"
+          title={`Edit Egg \u2014 ${egg.name}`}
+        />
 
         {error && (
           <Alert variant="destructive">
