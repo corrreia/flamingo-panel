@@ -107,6 +107,44 @@ remoteRoutes.get("/servers", async (c) => {
   });
 });
 
+// GET /api/remote/servers/:uuid - Wings fetches single server config
+remoteRoutes.get("/servers/:uuid", async (c) => {
+  const db = getDb(c.env.DB);
+  const server = await db
+    .select()
+    .from(schema.servers)
+    .where(eq(schema.servers.uuid, c.req.param("uuid")))
+    .get();
+  if (!server) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const egg = server.eggId
+    ? await db
+        .select()
+        .from(schema.eggs)
+        .where(eq(schema.eggs.id, server.eggId))
+        .get()
+    : null;
+
+  const eggVars = server.eggId
+    ? await db
+        .select()
+        .from(schema.eggVariables)
+        .where(eq(schema.eggVariables.eggId, server.eggId))
+        .all()
+    : [];
+
+  const serverVars = await db
+    .select()
+    .from(schema.serverVariables)
+    .where(eq(schema.serverVariables.serverId, server.id))
+    .all();
+
+  const environment = buildServerEnvironment(server, eggVars, serverVars);
+  return c.json(buildBootConfig(server, egg ?? null, environment));
+});
+
 // GET /api/remote/servers/:uuid/install - Wings fetches install script
 remoteRoutes.get("/servers/:uuid/install", async (c) => {
   const db = getDb(c.env.DB);
