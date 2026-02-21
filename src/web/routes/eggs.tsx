@@ -61,23 +61,103 @@ function EggsPage() {
       <div className="space-y-6">
         <h1 className="font-bold text-2xl tracking-tight">Eggs</h1>
 
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton className="h-16" key={i} />
-            ))}
-          </div>
-        ) : eggs?.length ? (
-          <div className="space-y-3">
-            {eggs.map((egg) => (
-              <EggRow egg={egg} key={egg.id} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState icon={Egg} title="No eggs available yet." />
-        )}
+        <EggsList eggs={eggs} isLoading={isLoading} />
       </div>
     </Layout>
+  );
+}
+
+function EggsList({
+  eggs,
+  isLoading,
+}: {
+  eggs: EggItem[] | undefined;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton className="h-16" key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!eggs?.length) {
+    return <EmptyState icon={Egg} title="No eggs available yet." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {eggs.map((egg) => (
+        <EggRow egg={egg} key={egg.id} />
+      ))}
+    </div>
+  );
+}
+
+function EggDetailContent({
+  detail,
+  isLoading,
+}: {
+  detail: EggDetail | undefined;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return <Skeleton className="h-20" />;
+  }
+
+  if (!detail) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="mb-1 text-muted-foreground text-xs">Docker Image</div>
+        <code className="rounded bg-muted px-2 py-1 font-mono text-sm">
+          {detail.dockerImage}
+        </code>
+      </div>
+      <div>
+        <div className="mb-1 text-muted-foreground text-xs">
+          Startup Command
+        </div>
+        <code className="block whitespace-pre-wrap rounded bg-muted px-2 py-1 font-mono text-sm">
+          {detail.startup}
+        </code>
+      </div>
+      {detail.variables.filter((v) => v.userViewable).length > 0 && (
+        <div>
+          <div className="mb-2 text-muted-foreground text-xs">Variables</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Env Variable</TableHead>
+                <TableHead>Default</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {detail.variables
+                .filter((v) => v.userViewable)
+                .map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell className="font-medium">{v.name}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {v.envVariable}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {v.defaultValue || "-"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -131,61 +211,7 @@ function EggRow({ egg }: { egg: EggItem }) {
       </CardHeader>
       {expanded && (
         <CardContent>
-          {isLoading ? (
-            <Skeleton className="h-20" />
-          ) : detail ? (
-            <div className="space-y-4">
-              <div>
-                <div className="mb-1 text-muted-foreground text-xs">
-                  Docker Image
-                </div>
-                <code className="rounded bg-muted px-2 py-1 font-mono text-sm">
-                  {detail.dockerImage}
-                </code>
-              </div>
-              <div>
-                <div className="mb-1 text-muted-foreground text-xs">
-                  Startup Command
-                </div>
-                <code className="block whitespace-pre-wrap rounded bg-muted px-2 py-1 font-mono text-sm">
-                  {detail.startup}
-                </code>
-              </div>
-              {detail.variables.filter((v) => v.userViewable).length > 0 && (
-                <div>
-                  <div className="mb-2 text-muted-foreground text-xs">
-                    Variables
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Env Variable</TableHead>
-                        <TableHead>Default</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {detail.variables
-                        .filter((v) => v.userViewable)
-                        .map((v) => (
-                          <TableRow key={v.id}>
-                            <TableCell className="font-medium">
-                              {v.name}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {v.envVariable}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {v.defaultValue || "-"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          ) : null}
+          <EggDetailContent detail={detail} isLoading={isLoading} />
         </CardContent>
       )}
     </Card>

@@ -32,6 +32,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
@@ -69,7 +70,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {user?.role === "admin" && (
               <>
                 <div className="mx-1 h-4 w-px bg-border" />
-                <span className="mr-1 text-muted-foreground text-xs">Admin</span>
+                <span className="mr-1 text-muted-foreground text-xs">
+                  Admin
+                </span>
                 <Button asChild size="sm" variant="ghost">
                   <Link to="/admin/nodes">
                     <Network className="mr-2 h-4 w-4" /> Nodes
@@ -162,7 +165,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {user?.role === "admin" && (
               <>
                 <div className="my-2 border-border border-t" />
-                <span className="mb-1 px-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Admin</span>
+                <span className="mb-1 px-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                  Admin
+                </span>
                 <Button
                   asChild
                   className="justify-start"
@@ -205,7 +210,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <img
               alt="Flamingo"
               className="h-48 w-auto"
+              height={192}
               src="/flamingo.svg"
+              width={144}
             />
           </div>
         </SheetContent>
