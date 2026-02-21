@@ -63,16 +63,18 @@ function DashboardPage() {
                         <Server className="h-4 w-4 text-primary" />
                         {s.name}
                       </CardTitle>
-                      <Badge
-                        variant={s.status === null ? "default" : "secondary"}
-                      >
-                        {s.status || "Active"}
-                      </Badge>
-                      {s.role === "subuser" && (
-                        <Badge className="text-xs" variant="outline">
-                          Shared
+                      <div className="flex gap-2">
+                        {s.role === "subuser" && (
+                          <Badge className="text-xs" variant="outline">
+                            Shared
+                          </Badge>
+                        )}
+                        <Badge
+                          variant={s.status === null ? "default" : "secondary"}
+                        >
+                          {s.status || "Active"}
                         </Badge>
-                      )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
