@@ -316,10 +316,9 @@ eggRoutes.get("/:id/export", async (c) => {
     .all();
 
   const dockerImages = JSON.parse(egg.dockerImages || "{}");
-  const startupCommands: Record<string, string> =
-    Object.keys(dockerImages).length > 0
-      ? { Default: egg.startup }
-      : { Default: egg.startup };
+  const startupCommands: Record<string, string> = {
+    Default: egg.startup,
+  };
 
   const exported = {
     _comment: "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY FLAMINGO PANEL",
@@ -329,14 +328,14 @@ eggRoutes.get("/:id/export", async (c) => {
     author: egg.author || "",
     description: egg.description || "",
     tags: JSON.parse(egg.tags || "[]"),
-    features: JSON.parse(egg.features || "{}"),
+    features: JSON.parse(egg.features || "[]"),
     docker_images: dockerImages,
     file_denylist: JSON.parse(egg.fileDenylist || "[]"),
     startup_commands: startupCommands,
     config: {
-      files: egg.configFiles || "[]",
-      startup: egg.configStartup || "{}",
-      logs: egg.configLogs || "{}",
+      files: JSON.parse(egg.configFiles || "{}"),
+      startup: JSON.parse(egg.configStartup || "{}"),
+      logs: JSON.parse(egg.configLogs || "{}"),
       stop: egg.stopCommand,
     },
     scripts: {
