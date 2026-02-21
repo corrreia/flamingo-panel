@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
 import {
@@ -47,9 +47,9 @@ remoteRoutes.get("/servers", async (c) => {
   const node = c.get("node");
   const db = getDb(c.env.DB);
 
-  const page = Number.parseInt(c.req.query("page") || "0", 10);
+  const page = Math.max(1, Number.parseInt(c.req.query("page") || "1", 10));
   const perPage = Number.parseInt(c.req.query("per_page") || "50", 10);
-  const offset = page * perPage;
+  const offset = (page - 1) * perPage;
 
   const servers = await db
     .select()
@@ -98,8 +98,8 @@ remoteRoutes.get("/servers", async (c) => {
     data,
     meta: {
       current_page: page,
-      from: offset,
-      last_page: Math.ceil((totalCount?.count ?? 0) / perPage),
+      from: offset + 1,
+      last_page: Math.max(1, Math.ceil((totalCount?.count ?? 0) / perPage)),
       per_page: perPage,
       to: offset + data.length,
       total: totalCount?.count ?? 0,
@@ -208,14 +208,23 @@ remoteRoutes.post("/servers/:uuid/install", async (c) => {
 remoteRoutes.post("/servers/reset", async (c) => {
   const node = c.get("node");
   const db = getDb(c.env.DB);
+  const now = new Date().toISOString();
 
+  // Clear stuck installation/restore statuses only (preserve install_failed, suspended, etc.)
   await db
     .update(schema.servers)
-    .set({
-      status: null,
-      containerStatus: "offline",
-      updatedAt: new Date().toISOString(),
-    })
+    .set({ status: null, updatedAt: now })
+    .where(
+      and(
+        eq(schema.servers.nodeId, node.id),
+        inArray(schema.servers.status, ["installing", "restoring_backup"])
+      )
+    );
+
+  // Mark all containers as offline (Wings just booted, nothing is running)
+  await db
+    .update(schema.servers)
+    .set({ containerStatus: "offline", updatedAt: now })
     .where(eq(schema.servers.nodeId, node.id));
 
   return c.body(null, 204);

@@ -21,8 +21,7 @@ export class ConsoleSession extends DurableObject {
     });
   }
 
-  // biome-ignore lint/suspicious/useAwait: DO fetch handler must be async
-  async fetch(request: Request): Promise<Response> {
+  fetch(request: Request): Response {
     const url = new URL(request.url);
 
     if (url.pathname === "/connect") {
@@ -34,6 +33,7 @@ export class ConsoleSession extends DurableObject {
       const wingsToken = url.searchParams.get("wingsToken") ?? "";
       const userId = url.searchParams.get("userId") ?? "";
       const serverId = url.searchParams.get("serverId") ?? "";
+      const panelUrl = url.searchParams.get("panelUrl") ?? "";
 
       // Accept the WebSocket from the client side of the pair
       const pair = new WebSocketPair();
@@ -47,9 +47,18 @@ export class ConsoleSession extends DurableObject {
         server.send(line);
       }
 
-      // Connect to Wings if not already connected
+      // Connect to Wings if not already connected.
+      // Use waitUntil so we return the 101 immediately — the browser gets
+      // "Connected" right away and console output flows once Wings is ready.
       if (!this.wingsSocket || this.wingsSocket.readyState !== WebSocket.OPEN) {
-        this.connectToWings(wingsUrl, wingsToken);
+        // Let the user know we're establishing the Wings connection
+        server.send(
+          JSON.stringify({
+            event: "daemon message",
+            args: ["Connecting to server console..."],
+          })
+        );
+        this.ctx.waitUntil(this.connectToWings(wingsUrl, wingsToken, panelUrl));
       }
 
       // Log the connection
@@ -66,7 +75,11 @@ export class ConsoleSession extends DurableObject {
     return new Response("Not found", { status: 404 });
   }
 
-  private connectToWings(wingsUrl: string, wingsToken: string) {
+  private async connectToWings(
+    wingsUrl: string,
+    wingsToken: string,
+    panelUrl: string
+  ) {
     if (this.wingsSocket) {
       try {
         this.wingsSocket.close();
@@ -76,11 +89,57 @@ export class ConsoleSession extends DurableObject {
       this.wingsSocket = null;
     }
 
-    const ws = new WebSocket(wingsUrl);
+    // Use fetch() with Upgrade header so we can set Origin.
+    // Wings checks Origin against its configured panel URL.
+    // Abort after 10s if Wings is unreachable.
+    let resp: Response;
+    try {
+      resp = await fetch(wingsUrl, {
+        headers: {
+          Upgrade: "websocket",
+          Origin: panelUrl,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      const reason =
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? "Connection to Wings timed out (10s)"
+          : "Failed to connect to Wings";
+      const errorMsg = JSON.stringify({
+        event: "daemon error",
+        args: [reason],
+      });
+      for (const client of this.ctx.getWebSockets()) {
+        try {
+          client.send(errorMsg);
+        } catch {
+          /* client gone */
+        }
+      }
+      return;
+    }
 
-    ws.addEventListener("open", () => {
-      ws.send(JSON.stringify({ event: "auth", args: [wingsToken] }));
-    });
+    const ws = resp.webSocket;
+    if (!ws) {
+      const errorMsg = JSON.stringify({
+        event: "daemon error",
+        args: [`Wings WebSocket upgrade failed (HTTP ${resp.status})`],
+      });
+      for (const client of this.ctx.getWebSockets()) {
+        try {
+          client.send(errorMsg);
+        } catch {
+          /* client gone */
+        }
+      }
+      return;
+    }
+
+    ws.accept();
+
+    // Authenticate with Wings
+    ws.send(JSON.stringify({ event: "auth", args: [wingsToken] }));
 
     ws.addEventListener("message", (event) => {
       const data = typeof event.data === "string" ? event.data : "";
@@ -113,7 +172,7 @@ export class ConsoleSession extends DurableObject {
         try {
           client.send(msg);
         } catch {
-          // Client may have disconnected
+          /* client gone */
         }
       }
     });
