@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
+import { getServerAccess } from "../lib/server-access";
 import { WingsClient } from "../lib/wings-client";
 import { type AuthUser, requireAuth } from "./middleware/auth";
 
@@ -21,17 +22,11 @@ fileRoutes.use("*", requireAuth);
 async function getServerAndClient(c: Context<FileEnv>) {
   const user = c.get("user");
   const db = getDb(c.env.DB);
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(eq(schema.servers.id, c.req.param("serverId")))
-    .get();
-  if (!server) {
+  const access = await getServerAccess(db, c.req.param("serverId"), user);
+  if (!access) {
     return { error: c.json({ error: "Server not found" }, 404) };
   }
-  if (user.role !== "admin" && server.ownerId !== user.id) {
-    return { error: c.json({ error: "Forbidden" }, 403) };
-  }
+  const { server } = access;
   const node = await db
     .select()
     .from(schema.nodes)
