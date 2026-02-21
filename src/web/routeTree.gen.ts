@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as EggsRouteImport } from './routes/eggs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServerServerIdRouteImport } from './routes/server/$serverId'
 import { Route as AdminCreateServerRouteImport } from './routes/admin/create-server'
@@ -23,6 +24,11 @@ import { Route as AdminEggsEggIdRouteImport } from './routes/admin/eggs/$eggId'
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EggsRoute = EggsRouteImport.update({
+  id: '/eggs',
+  path: '/eggs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -73,6 +79,7 @@ const AdminEggsEggIdRoute = AdminEggsEggIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/eggs': typeof EggsRoute
   '/login': typeof LoginRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/eggs': typeof EggsRoute
   '/login': typeof LoginRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/eggs': typeof EggsRoute
   '/login': typeof LoginRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/eggs'
     | '/login'
     | '/admin/activity'
     | '/admin/create-server'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/eggs'
     | '/login'
     | '/admin/activity'
     | '/admin/create-server'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/eggs'
     | '/login'
     | '/admin/activity'
     | '/admin/create-server'
@@ -149,6 +161,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EggsRoute: typeof EggsRoute
   LoginRoute: typeof LoginRoute
   AdminActivityRoute: typeof AdminActivityRoute
   AdminCreateServerRoute: typeof AdminCreateServerRoute
@@ -167,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/eggs': {
+      id: '/eggs'
+      path: '/eggs'
+      fullPath: '/eggs'
+      preLoaderRoute: typeof EggsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -237,6 +257,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EggsRoute: EggsRoute,
   LoginRoute: LoginRoute,
   AdminActivityRoute: AdminActivityRoute,
   AdminCreateServerRoute: AdminCreateServerRoute,
