@@ -11,6 +11,7 @@ import { requireAdmin, requireAuth } from "./middleware/auth";
 import { nodeRoutes } from "./nodes";
 import { remoteRoutes } from "./remote";
 import { serverRoutes } from "./servers";
+import { subuserRoutes } from "./subusers";
 
 export const apiRoutes = new Hono<{ Bindings: Env }>();
 
@@ -103,6 +104,7 @@ apiRoutes.route("/auth", authRoutes);
 apiRoutes.route("/nodes", nodeRoutes);
 apiRoutes.route("/servers", serverRoutes);
 apiRoutes.route("/servers", fileRoutes); // mounts /:serverId/files/*
+apiRoutes.route("/servers", subuserRoutes); // mounts /:serverId/subusers/*
 apiRoutes.route("/eggs", eggRoutes);
 apiRoutes.route("/remote", remoteRoutes);
 apiRoutes.route("/application", applicationRoutes);
