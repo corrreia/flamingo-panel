@@ -89,12 +89,16 @@ export class ConsoleSession extends DurableObject {
       this.wingsSocket = null;
     }
 
+    // Workers fetch() only supports http(s):// — convert wss:// back to https://
+    // (the wingsUrl was built with wss:// for browser WebSocket, but DOs use fetch + Upgrade)
+    const fetchUrl = wingsUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
+
     // Use fetch() with Upgrade header so we can set Origin.
     // Wings checks Origin against its configured panel URL.
     // Abort after 10s if Wings is unreachable.
     let resp: Response;
     try {
-      resp = await fetch(wingsUrl, {
+      resp = await fetch(fetchUrl, {
         headers: {
           Upgrade: "websocket",
           Origin: panelUrl,
@@ -105,7 +109,7 @@ export class ConsoleSession extends DurableObject {
       const reason =
         err instanceof DOMException && err.name === "TimeoutError"
           ? "Connection to Wings timed out (10s)"
-          : "Failed to connect to Wings";
+          : `Failed to connect to Wings: ${err instanceof Error ? err.message : String(err)}`;
       const errorMsg = JSON.stringify({
         event: "daemon error",
         args: [reason],
