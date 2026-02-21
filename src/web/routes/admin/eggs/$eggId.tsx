@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { CodeEditor } from "@web/components/code-editor";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
@@ -529,11 +530,11 @@ function EditEggPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="egg-config-startup">Config: Startup</Label>
-                    <Textarea
-                      className="h-24 font-mono text-xs"
-                      id="egg-config-startup"
-                      onChange={(e) => setConfigStartup(e.target.value)}
+                    <Label>Config: Startup</Label>
+                    <CodeEditor
+                      className="h-24"
+                      language="json"
+                      onChange={setConfigStartup}
                       placeholder="{}"
                       value={configStartup}
                     />
@@ -543,11 +544,11 @@ function EditEggPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="egg-config-files">Config: Files</Label>
-                    <Textarea
-                      className="h-24 font-mono text-xs"
-                      id="egg-config-files"
-                      onChange={(e) => setConfigFiles(e.target.value)}
+                    <Label>Config: Files</Label>
+                    <CodeEditor
+                      className="h-24"
+                      language="json"
+                      onChange={setConfigFiles}
                       placeholder="[]"
                       value={configFiles}
                     />
@@ -557,11 +558,11 @@ function EditEggPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="egg-config-logs">Config: Logs</Label>
-                    <Textarea
-                      className="h-24 font-mono text-xs"
-                      id="egg-config-logs"
-                      onChange={(e) => setConfigLogs(e.target.value)}
+                    <Label>Config: Logs</Label>
+                    <CodeEditor
+                      className="h-24"
+                      language="json"
+                      onChange={setConfigLogs}
                       placeholder="{}"
                       value={configLogs}
                     />
@@ -739,12 +740,12 @@ function EditEggPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="egg-script-install">Install Script</Label>
-                    <Textarea
-                      className="h-64 font-mono text-xs"
-                      id="egg-script-install"
-                      onChange={(e) => setScriptInstall(e.target.value)}
-                      placeholder="#!/bin/bash&#10;# Installation commands..."
+                    <Label>Install Script</Label>
+                    <CodeEditor
+                      className="h-64"
+                      language="bash"
+                      onChange={setScriptInstall}
+                      placeholder="#!/bin/bash\n# Installation commands..."
                       value={scriptInstall}
                     />
                   </div>
