@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
+import { getServerAccess } from "../lib/server-access";
 import { type ServerApiResponse, WingsClient } from "../lib/wings-client";
 import { signWingsWebsocketToken, WS_PERMISSIONS } from "../lib/wings-jwt";
 import {
@@ -155,22 +156,29 @@ serverRoutes.post(
   }
 );
 
-// List servers (admin sees all, user sees own)
+// List servers (admin sees all, user sees owned + shared)
 serverRoutes.get("/", async (c) => {
   const user = c.get("user");
   const db = getDb(c.env.DB);
 
-  let serverList: (typeof schema.servers.$inferSelect)[];
+  // For admin: all servers with role "admin"
   if (user.role === "admin") {
-    serverList = await db.select().from(schema.servers).all();
-  } else {
-    serverList = await db
-      .select()
-      .from(schema.servers)
-      .where(eq(schema.servers.ownerId, user.id))
-      .all();
+    const all = await db.select().from(schema.servers).all();
+    return c.json(all.map(s => ({ ...s, role: "admin" as const })));
   }
 
+  // For regular users: owned + shared
+  const owned = await db.select().from(schema.servers)
+    .where(eq(schema.servers.ownerId, user.id)).all();
+  const shared = await db.select({ server: schema.servers })
+    .from(schema.subusers)
+    .innerJoin(schema.servers, eq(schema.subusers.serverId, schema.servers.id))
+    .where(eq(schema.subusers.userId, user.id)).all();
+
+  const serverList = [
+    ...owned.map(s => ({ ...s, role: "owner" as const })),
+    ...shared.map(r => ({ ...r.server, role: "subuser" as const })),
+  ];
   return c.json(serverList);
 });
 
@@ -178,18 +186,10 @@ serverRoutes.get("/", async (c) => {
 serverRoutes.get("/:id", async (c) => {
   const user = c.get("user");
   const db = getDb(c.env.DB);
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(eq(schema.servers.id, c.req.param("id")))
-    .get();
 
-  if (!server) {
-    return c.json({ error: "Server not found" }, 404);
-  }
-  if (user.role !== "admin" && server.ownerId !== user.id) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+  const access = await getServerAccess(db, c.req.param("id"), user);
+  if (!access) return c.json({ error: "Server not found" }, 404);
+  const { server, role } = access;
 
   const node = await db
     .select()
@@ -207,7 +207,7 @@ serverRoutes.get("/:id", async (c) => {
     }
   }
 
-  return c.json({ ...server, resources });
+  return c.json({ ...server, role, resources });
 });
 
 // Reinstall server on Wings (re-sends the full create payload)
@@ -283,17 +283,9 @@ serverRoutes.post(
     const db = getDb(c.env.DB);
     const { action } = c.req.valid("json");
 
-    const server = await db
-      .select()
-      .from(schema.servers)
-      .where(eq(schema.servers.id, c.req.param("id")))
-      .get();
-    if (!server) {
-      return c.json({ error: "Server not found" }, 404);
-    }
-    if (user.role !== "admin" && server.ownerId !== user.id) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    const access = await getServerAccess(db, c.req.param("id"), user);
+    if (!access) return c.json({ error: "Server not found" }, 404);
+    const { server } = access;
 
     const node = await db
       .select()
@@ -330,17 +322,9 @@ serverRoutes.post(
     const db = getDb(c.env.DB);
     const { command } = c.req.valid("json");
 
-    const server = await db
-      .select()
-      .from(schema.servers)
-      .where(eq(schema.servers.id, c.req.param("id")))
-      .get();
-    if (!server) {
-      return c.json({ error: "Server not found" }, 404);
-    }
-    if (user.role !== "admin" && server.ownerId !== user.id) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    const access = await getServerAccess(db, c.req.param("id"), user);
+    if (!access) return c.json({ error: "Server not found" }, 404);
+    const { server } = access;
 
     const node = await db
       .select()
@@ -368,17 +352,9 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
   const user = c.get("user");
   const db = getDb(c.env.DB);
 
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(eq(schema.servers.id, c.req.param("id")))
-    .get();
-  if (!server) {
-    return c.json({ error: "Server not found" }, 404);
-  }
-  if (user.role !== "admin" && server.ownerId !== user.id) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+  const access = await getServerAccess(db, c.req.param("id"), user);
+  if (!access) return c.json({ error: "Server not found" }, 404);
+  const { server } = access;
 
   const node = await db
     .select()
@@ -435,18 +411,11 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
 serverRoutes.delete("/:id", async (c) => {
   const user = c.get("user");
   const db = getDb(c.env.DB);
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(eq(schema.servers.id, c.req.param("id")))
-    .get();
 
-  if (!server) {
-    return c.json({ error: "Server not found" }, 404);
-  }
-  if (user.role !== "admin" && server.ownerId !== user.id) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+  const access = await getServerAccess(db, c.req.param("id"), user);
+  if (!access) return c.json({ error: "Server not found" }, 404);
+  if (access.role === "subuser") return c.json({ error: "Forbidden" }, 403);
+  const { server } = access;
 
   // Remove from Wings node
   const node = await db
