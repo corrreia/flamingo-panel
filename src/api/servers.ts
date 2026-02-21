@@ -34,9 +34,9 @@ serverRoutes.post(
       nodeId: z.number().int(),
       ownerId: z.string().min(1),
       eggId: z.string().min(1),
-      memory: z.number().int().min(64).default(512),
-      disk: z.number().int().min(128).default(1024),
-      cpu: z.number().int().min(10).default(100),
+      memory: z.number().int().min(0).default(512), // 0 = unlimited
+      disk: z.number().int().min(0).default(1024), // 0 = unlimited
+      cpu: z.number().int().min(0).default(100), // 0 = unlimited
       swap: z.number().int().default(0),
       io: z.number().int().default(500),
       defaultAllocationPort: z

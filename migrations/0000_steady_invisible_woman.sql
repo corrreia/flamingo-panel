@@ -19,16 +19,21 @@ CREATE TABLE `activity_logs` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` text,
 	`server_id` text,
+	`node_id` integer,
 	`event` text NOT NULL,
 	`metadata` text DEFAULT '{}',
 	`ip` text DEFAULT '',
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`server_id`) REFERENCES `servers`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`server_id`) REFERENCES `servers`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`node_id`) REFERENCES `nodes`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
 CREATE INDEX `idx_activity_server` ON `activity_logs` (`server_id`);--> statement-breakpoint
 CREATE INDEX `idx_activity_user` ON `activity_logs` (`user_id`);--> statement-breakpoint
+CREATE INDEX `idx_activity_node` ON `activity_logs` (`node_id`);--> statement-breakpoint
+CREATE INDEX `idx_activity_event` ON `activity_logs` (`event`);--> statement-breakpoint
+CREATE INDEX `idx_activity_created` ON `activity_logs` (`created_at`);--> statement-breakpoint
 CREATE TABLE `api_keys` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -86,11 +91,6 @@ CREATE TABLE `nodes` (
 	`url` text DEFAULT '' NOT NULL,
 	`token_id` text NOT NULL,
 	`token` text NOT NULL,
-	`memory` integer DEFAULT 0 NOT NULL,
-	`memory_overallocate` integer DEFAULT 0 NOT NULL,
-	`disk` integer DEFAULT 0 NOT NULL,
-	`disk_overallocate` integer DEFAULT 0 NOT NULL,
-	`cpu_threads` integer DEFAULT 0 NOT NULL,
 	`upload_size` integer DEFAULT 100 NOT NULL,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL
@@ -128,6 +128,7 @@ CREATE TABLE `servers` (
 	`default_allocation_port` integer DEFAULT 25565 NOT NULL,
 	`additional_allocations` text DEFAULT '[]',
 	`status` text,
+	`container_status` text DEFAULT 'offline',
 	`installed_at` text,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL,

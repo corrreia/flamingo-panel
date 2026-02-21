@@ -4,7 +4,7 @@ Default to using Bun instead of Node.js.
 - Use `bun install` instead of `npm install`
 - Use `bun run <script>` instead of `npm run <script>`
 - Use `bunx <package>` instead of `npx <package>`
-- Do NOT touch or run database migrations
+- Do NOT edit `.sql` files, generate migrations, or run migrations. Database schema changes are handled manually by the user.
 
 ## Stack
 

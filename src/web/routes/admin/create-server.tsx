@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@web/components/ui/select";
 import { Skeleton } from "@web/components/ui/skeleton";
+import { Switch } from "@web/components/ui/switch";
 import { api } from "@web/lib/api";
 import { ChevronRight, Server } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -87,6 +88,9 @@ function CreateServerPage() {
   const [memory, setMemory] = useState("512");
   const [cpu, setCpu] = useState("100");
   const [disk, setDisk] = useState("1024");
+  const [unlimitedMemory, setUnlimitedMemory] = useState(false);
+  const [unlimitedCpu, setUnlimitedCpu] = useState(false);
+  const [unlimitedDisk, setUnlimitedDisk] = useState(false);
   const [port, setPort] = useState("25565");
   const [selectedImage, setSelectedImage] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -160,9 +164,9 @@ function CreateServerPage() {
         ownerId,
         nodeId: Number.parseInt(nodeId, 10),
         eggId,
-        memory: Number.parseInt(memory, 10),
-        cpu: Number.parseInt(cpu, 10),
-        disk: Number.parseInt(disk, 10),
+        memory: unlimitedMemory ? 0 : Number.parseInt(memory, 10),
+        cpu: unlimitedCpu ? 0 : Number.parseInt(cpu, 10),
+        disk: unlimitedDisk ? 0 : Number.parseInt(disk, 10),
         defaultAllocationPort: Number.parseInt(port, 10),
         image: selectedImage || undefined,
         variables,
@@ -368,33 +372,69 @@ function CreateServerPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="srv-memory">Memory (MB)</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="srv-memory">Memory (MB)</Label>
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      Unlimited
+                      <Switch
+                        checked={unlimitedMemory}
+                        onCheckedChange={setUnlimitedMemory}
+                        size="sm"
+                      />
+                    </div>
+                  </div>
                   <Input
+                    disabled={unlimitedMemory}
                     id="srv-memory"
                     min="64"
                     onChange={(e) => setMemory(e.target.value)}
+                    placeholder={unlimitedMemory ? "Unlimited" : undefined}
                     type="number"
-                    value={memory}
+                    value={unlimitedMemory ? "" : memory}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="srv-cpu">CPU Limit (%)</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="srv-cpu">CPU Limit (%)</Label>
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      Unlimited
+                      <Switch
+                        checked={unlimitedCpu}
+                        onCheckedChange={setUnlimitedCpu}
+                        size="sm"
+                      />
+                    </div>
+                  </div>
                   <Input
+                    disabled={unlimitedCpu}
                     id="srv-cpu"
                     min="10"
                     onChange={(e) => setCpu(e.target.value)}
+                    placeholder={unlimitedCpu ? "Unlimited" : undefined}
                     type="number"
-                    value={cpu}
+                    value={unlimitedCpu ? "" : cpu}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="srv-disk">Disk (MB)</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="srv-disk">Disk (MB)</Label>
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      Unlimited
+                      <Switch
+                        checked={unlimitedDisk}
+                        onCheckedChange={setUnlimitedDisk}
+                        size="sm"
+                      />
+                    </div>
+                  </div>
                   <Input
+                    disabled={unlimitedDisk}
                     id="srv-disk"
                     min="128"
                     onChange={(e) => setDisk(e.target.value)}
+                    placeholder={unlimitedDisk ? "Unlimited" : undefined}
                     type="number"
-                    value={disk}
+                    value={unlimitedDisk ? "" : disk}
                   />
                 </div>
                 <div className="space-y-2">
@@ -509,15 +549,21 @@ function CreateServerPage() {
                 )}
                 <div>
                   <span className="text-muted-foreground">Memory:</span>
-                  <span className="ml-2 font-medium">{memory} MB</span>
+                  <span className="ml-2 font-medium">
+                    {unlimitedMemory ? "Unlimited" : `${memory} MB`}
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">CPU:</span>
-                  <span className="ml-2 font-medium">{cpu}%</span>
+                  <span className="ml-2 font-medium">
+                    {unlimitedCpu ? "Unlimited" : `${cpu}%`}
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Disk:</span>
-                  <span className="ml-2 font-medium">{disk} MB</span>
+                  <span className="ml-2 font-medium">
+                    {unlimitedDisk ? "Unlimited" : `${disk} MB`}
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Port:</span>

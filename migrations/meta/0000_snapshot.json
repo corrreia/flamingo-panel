@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "339b0a19-e4a7-4154-a475-9e8fce574202",
+  "id": "26e079a6-e6f1-4a0f-9365-a8b439610090",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "accounts": {
@@ -145,6 +145,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "node_id": {
+          "name": "node_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "event": {
           "name": "event",
           "type": "text",
@@ -191,6 +198,27 @@
             "user_id"
           ],
           "isUnique": false
+        },
+        "idx_activity_node": {
+          "name": "idx_activity_node",
+          "columns": [
+            "node_id"
+          ],
+          "isUnique": false
+        },
+        "idx_activity_event": {
+          "name": "idx_activity_event",
+          "columns": [
+            "event"
+          ],
+          "isUnique": false
+        },
+        "idx_activity_created": {
+          "name": "idx_activity_created",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -218,6 +246,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "activity_logs_node_id_nodes_id_fk": {
+          "name": "activity_logs_node_id_nodes_id_fk",
+          "tableFrom": "activity_logs",
+          "tableTo": "nodes",
+          "columnsFrom": [
+            "node_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -631,46 +672,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "memory": {
-          "name": "memory",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "memory_overallocate": {
-          "name": "memory_overallocate",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "disk": {
-          "name": "disk",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "disk_overallocate": {
-          "name": "disk_overallocate",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "cpu_threads": {
-          "name": "cpu_threads",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
         "upload_size": {
           "name": "upload_size",
           "type": "integer",
@@ -938,6 +939,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "container_status": {
+          "name": "container_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'offline'"
         },
         "installed_at": {
           "name": "installed_at",
