@@ -261,14 +261,12 @@ function NodeDetailPage() {
 
         {/* Tabs outside card, content inside */}
         <Tabs defaultValue="overview">
-          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="settings">
-                <Settings className="mr-1.5 h-3.5 w-3.5" /> Settings
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="settings">
+              <Settings className="mr-1.5 h-3.5 w-3.5" /> Settings
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="overview">
             <Card>

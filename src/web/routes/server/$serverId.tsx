@@ -152,29 +152,27 @@ function ServerPage() {
         )}
 
         <Tabs defaultValue="console">
-          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-            <TabsList>
-              <TabsTrigger value="console">
-                <Terminal className="mr-2 h-4 w-4" /> Console
+          <TabsList>
+            <TabsTrigger value="console">
+              <Terminal className="mr-2 h-4 w-4" /> Console
+            </TabsTrigger>
+            <TabsTrigger value="files">
+              <FolderOpen className="mr-2 h-4 w-4" /> Files
+            </TabsTrigger>
+            {canManage && (
+              <TabsTrigger value="settings">
+                <Settings className="mr-2 h-4 w-4" /> Settings
               </TabsTrigger>
-              <TabsTrigger value="files">
-                <FolderOpen className="mr-2 h-4 w-4" /> Files
+            )}
+            <TabsTrigger value="activity">
+              <ClipboardList className="mr-2 h-4 w-4" /> Activity
+            </TabsTrigger>
+            {canManage && (
+              <TabsTrigger value="users">
+                <Users className="mr-2 h-4 w-4" /> Users
               </TabsTrigger>
-              {canManage && (
-                <TabsTrigger value="settings">
-                  <Settings className="mr-2 h-4 w-4" /> Settings
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="activity">
-                <ClipboardList className="mr-2 h-4 w-4" /> Activity
-              </TabsTrigger>
-              {canManage && (
-                <TabsTrigger value="users">
-                  <Users className="mr-2 h-4 w-4" /> Users
-                </TabsTrigger>
-              )}
-            </TabsList>
-          </div>
+            )}
+          </TabsList>
           <TabsContent value="console">
             <ConsoleTab serverId={server.id} />
           </TabsContent>

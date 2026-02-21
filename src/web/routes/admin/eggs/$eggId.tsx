@@ -351,14 +351,12 @@ function EditEggPage() {
         {/* Tabbed Form */}
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="configuration">
-            <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-              <TabsList>
-                <TabsTrigger value="configuration">Configuration</TabsTrigger>
-                <TabsTrigger value="process">Process Management</TabsTrigger>
-                <TabsTrigger value="variables">Variables</TabsTrigger>
-                <TabsTrigger value="install">Install Script</TabsTrigger>
-              </TabsList>
-            </div>
+            <TabsList>
+              <TabsTrigger value="configuration">Configuration</TabsTrigger>
+              <TabsTrigger value="process">Process Management</TabsTrigger>
+              <TabsTrigger value="variables">Variables</TabsTrigger>
+              <TabsTrigger value="install">Install Script</TabsTrigger>
+            </TabsList>
 
             {/* ── Tab: Configuration ──────────────────────────────── */}
             <TabsContent value="configuration">

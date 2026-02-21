@@ -43,7 +43,6 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
-import { Textarea } from "@web/components/ui/textarea";
 import { api } from "@web/lib/api";
 import {
   ChevronDown,
@@ -54,7 +53,61 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+function JsonEditor({
+  value,
+  onChange,
+}: { value: string; onChange: (val: string) => void }) {
+  const [editor, setEditor] = useState<{
+    Editor: typeof import("react-simple-code-editor").default;
+    Prism: typeof import("prismjs");
+  } | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      import("react-simple-code-editor"),
+      import("prismjs"),
+    ]).then(async ([editorMod, prismMod]) => {
+      await import("prismjs/components/prism-json");
+      setEditor({ Editor: editorMod.default, Prism: prismMod });
+    });
+  }, []);
+
+  if (!editor) {
+    return (
+      <div className="h-64 rounded-md border border-input bg-transparent shadow-xs dark:bg-input/30">
+        <textarea
+          className="h-full w-full resize-none bg-transparent p-3 font-mono text-xs outline-none"
+          onChange={(e) => onChange(e.target.value)}
+          placeholder='{"name": "Minecraft", ...}'
+          value={value}
+        />
+      </div>
+    );
+  }
+
+  const { Editor: Ed, Prism } = editor;
+  return (
+    <div className="h-64 overflow-auto rounded-md border border-input bg-transparent shadow-xs dark:bg-input/30">
+      <Ed
+        highlight={(code) =>
+          Prism.highlight(code, Prism.languages.json, "json")
+        }
+        onValueChange={onChange}
+        padding={12}
+        placeholder='{"name": "Minecraft", ...}'
+        style={{
+          fontFamily: "ui-monospace, monospace",
+          fontSize: "0.75rem",
+          lineHeight: "1.5",
+          minHeight: "100%",
+        }}
+        value={value}
+      />
+    </div>
+  );
+}
 
 interface EggItem {
   createdAt: string;
@@ -234,7 +287,7 @@ function EggsPage() {
                     <Upload className="mr-2 h-4 w-4" /> Import Egg
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl overflow-hidden">
                   <DialogHeader>
                     <DialogTitle>Import Egg</DialogTitle>
                     <DialogDescription>
@@ -242,7 +295,7 @@ function EggsPage() {
                       egg formats. Paste JSON or upload a file.
                     </DialogDescription>
                   </DialogHeader>
-                  <form className="space-y-4" onSubmit={handleImport}>
+                  <form className="min-w-0 space-y-4" onSubmit={handleImport}>
                     {error && (
                       <Alert variant="destructive">
                         <AlertDescription>{error}</AlertDescription>
@@ -259,11 +312,8 @@ function EggsPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="egg-json">Or paste JSON</Label>
-                      <Textarea
-                        className="h-64 font-mono text-xs"
-                        id="egg-json"
-                        onChange={(e) => setImportJson(e.target.value)}
-                        placeholder='{"name": "Minecraft", ...}'
+                      <JsonEditor
+                        onChange={setImportJson}
                         value={importJson}
                       />
                     </div>

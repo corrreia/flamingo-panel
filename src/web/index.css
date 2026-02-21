@@ -84,4 +84,18 @@
     color: hsl(var(--foreground));
     background-color: hsl(var(--background));
   }
+
+  /* Prism JSON syntax highlighting */
+  .token.property { color: hsl(210 80% 55%); }
+  .token.string { color: hsl(140 60% 40%); }
+  .token.number { color: hsl(30 80% 50%); }
+  .token.boolean { color: hsl(330 80% 60%); }
+  .token.null-value { color: hsl(var(--muted-foreground)); }
+  .token.punctuation { color: hsl(var(--muted-foreground)); }
+  .token.operator { color: hsl(var(--foreground)); }
+
+  .dark .token.property { color: hsl(210 80% 70%); }
+  .dark .token.string { color: hsl(140 60% 65%); }
+  .dark .token.number { color: hsl(30 80% 65%); }
+  .dark .token.boolean { color: hsl(330 80% 70%); }
 }
