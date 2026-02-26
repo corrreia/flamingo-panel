@@ -38,22 +38,19 @@
     {
       "binding": "DB",
       "database_name": "flamingo-d1",
-      "database_id": "f39948a6-531a-4820-91fd-701c9b47f333",
-      "remote": true
+      "database_id": "f39948a6-531a-4820-91fd-701c9b47f333"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "53b5da6c59c44bc2911096f86aee9563",
-      "remote": true
+      "id": "53b5da6c59c44bc2911096f86aee9563"
     }
   ],
   "r2_buckets": [
     {
       "binding": "R2",
-      "bucket_name": "flamingo-r2",
-      "remote": true
+      "bucket_name": "flamingo-r2"
     }
   ],
   "ratelimits": [

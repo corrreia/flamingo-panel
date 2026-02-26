@@ -53,7 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Button>
           <Link
             className="mr-4 flex items-center gap-2 font-bold text-primary text-xl"
-            to="/"
+            href="/"
           >
             Flamingo
           </Link>
