@@ -1,4 +1,5 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@web/components/ui/avatar";
 import { Button } from "@web/components/ui/button";
 import {
@@ -30,12 +31,12 @@ import { useEffect, useState } from "react";
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
+  const pathname = usePathname();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
-  }, [location.pathname]);
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -58,12 +59,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="hidden md:flex md:items-center md:gap-1">
             <Button asChild size="sm" variant="ghost">
-              <Link to="/">
+              <Link href="/">
                 <Server className="mr-2 h-4 w-4" /> Servers
               </Link>
             </Button>
             <Button asChild size="sm" variant="ghost">
-              <Link to="/eggs">
+              <Link href="/eggs">
                 <Egg className="mr-2 h-4 w-4" /> Eggs
               </Link>
             </Button>
@@ -74,17 +75,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   Admin
                 </span>
                 <Button asChild size="sm" variant="ghost">
-                  <Link to="/admin/nodes">
+                  <Link href="/admin/nodes">
                     <Network className="mr-2 h-4 w-4" /> Nodes
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="ghost">
-                  <Link to="/admin/eggs">
+                  <Link href="/admin/eggs">
                     <Egg className="mr-2 h-4 w-4" /> Eggs
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="ghost">
-                  <Link to="/admin/activity">
+                  <Link href="/admin/activity">
                     <ClipboardList className="mr-2 h-4 w-4" /> Activity
                   </Link>
                 </Button>
@@ -95,7 +96,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2">
           {user?.role === "admin" && (
             <Button asChild className="hidden md:inline-flex" size="sm">
-              <Link to="/admin/create-server">
+              <Link href="/admin/create-server">
                 <Plus className="mr-2 h-4 w-4" /> Create Server
               </Link>
             </Button>
@@ -153,12 +154,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </SheetHeader>
           <nav className="flex flex-col gap-1 px-4">
             <Button asChild className="justify-start" size="sm" variant="ghost">
-              <Link to="/">
+              <Link href="/">
                 <Server className="mr-2 h-4 w-4" /> Servers
               </Link>
             </Button>
             <Button asChild className="justify-start" size="sm" variant="ghost">
-              <Link to="/eggs">
+              <Link href="/eggs">
                 <Egg className="mr-2 h-4 w-4" /> Eggs
               </Link>
             </Button>
@@ -174,7 +175,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   size="sm"
                   variant="ghost"
                 >
-                  <Link to="/admin/nodes">
+                  <Link href="/admin/nodes">
                     <Network className="mr-2 h-4 w-4" /> Nodes
                   </Link>
                 </Button>
@@ -184,7 +185,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   size="sm"
                   variant="ghost"
                 >
-                  <Link to="/admin/eggs">
+                  <Link href="/admin/eggs">
                     <Egg className="mr-2 h-4 w-4" /> Eggs
                   </Link>
                 </Button>
@@ -194,12 +195,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   size="sm"
                   variant="ghost"
                 >
-                  <Link to="/admin/activity">
+                  <Link href="/admin/activity">
                     <ClipboardList className="mr-2 h-4 w-4" /> Activity
                   </Link>
                 </Button>
                 <Button asChild className="mt-2 justify-start" size="sm">
-                  <Link to="/admin/create-server">
+                  <Link href="/admin/create-server">
                     <Plus className="mr-2 h-4 w-4" /> Create Server
                   </Link>
                 </Button>

@@ -1,5 +1,7 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { CodeEditor } from "@web/components/code-editor";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
@@ -88,12 +90,6 @@ interface VariableEntry {
   userViewable: boolean;
 }
 
-// ── Route ──────────────────────────────────────────────────────────
-
-export const Route = createFileRoute("/admin/eggs/$eggId")({
-  component: EditEggPage,
-});
-
 // ── Helpers ────────────────────────────────────────────────────────
 
 function parseDockerImages(raw: string | null): DockerImageEntry[] {
@@ -122,9 +118,9 @@ function parseCsv(raw: string | null): string {
 
 // ── Component ──────────────────────────────────────────────────────
 
-function EditEggPage() {
-  const { eggId } = Route.useParams();
-  const navigate = useNavigate();
+export default function EditEggPage({ params }: { params: { eggId: string } }) {
+  const { eggId } = params;
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   // ── Fetch egg ────────────────────────────────────────────────────
@@ -244,7 +240,7 @@ function EditEggPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["eggs"] });
       queryClient.invalidateQueries({ queryKey: ["egg", eggId] });
-      navigate({ to: "/admin/eggs" });
+      router.push("/admin/eggs");
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -254,7 +250,7 @@ function EditEggPage() {
     mutationFn: () => api.delete(`/eggs/${eggId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["eggs"] });
-      navigate({ to: "/admin/eggs" });
+      router.push("/admin/eggs");
     },
     onError: (err: Error) => {
       setDeleteError(err.message);

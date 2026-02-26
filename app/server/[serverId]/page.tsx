@@ -1,5 +1,6 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
 import { ActivityTab } from "@web/components/server/activity-tab";
@@ -72,10 +73,6 @@ interface ServerDetail {
   uuid: string;
 }
 
-export const Route = createFileRoute("/server/$serverId")({
-  component: ServerPage,
-});
-
 function getStatusVariant(
   s: ServerDetail
 ): "default" | "destructive" | "secondary" {
@@ -98,8 +95,8 @@ function getStatusLabel(s: ServerDetail): string {
   return s.containerStatus || s.resources?.state || "offline";
 }
 
-function ServerPage() {
-  const { serverId } = Route.useParams();
+export default function ServerPage({ params }: { params: { serverId: string } }) {
+  const { serverId } = params;
 
   const { data: server, isLoading } = useQuery({
     queryKey: ["server", serverId],

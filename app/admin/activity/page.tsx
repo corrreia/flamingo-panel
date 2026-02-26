@@ -1,5 +1,7 @@
+"use client";
+
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
 import { TablePagination } from "@web/components/table-pagination";
@@ -62,11 +64,7 @@ interface UserItem {
   username: string;
 }
 
-export const Route = createFileRoute("/admin/activity")({
-  component: ActivityLogPage,
-});
-
-function ActivityLogPage() {
+export default function ActivityLogPage() {
   const [page, setPage] = useState(0);
   const [serverId, setServerId] = useState<string>("");
   const [nodeId, setNodeId] = useState<string>("");
@@ -234,8 +232,7 @@ function ActivityLogPage() {
                       {entry.serverName ? (
                         <Link
                           className="text-primary hover:underline"
-                          params={{ serverId: entry.serverId ?? "" }}
-                          to="/server/$serverId"
+                          href={`/server/${entry.serverId}`}
                         >
                           {entry.serverName}
                         </Link>

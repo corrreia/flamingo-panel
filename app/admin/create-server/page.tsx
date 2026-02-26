@@ -1,5 +1,8 @@
+"use client";
+
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
@@ -59,10 +62,6 @@ interface EggDetail extends EggItem {
   variables: EggVariable[];
 }
 
-export const Route = createFileRoute("/admin/create-server")({
-  component: CreateServerPage,
-});
-
 function getStepClassName(i: number, step: number): string {
   if (i === step) {
     return "bg-primary text-primary-foreground";
@@ -74,8 +73,8 @@ function getStepClassName(i: number, step: number): string {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-step wizard component
-function CreateServerPage() {
-  const navigate = useNavigate();
+export default function CreateServerPage() {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
 
@@ -171,7 +170,7 @@ function CreateServerPage() {
         image: selectedImage || undefined,
         variables,
       }),
-    onSuccess: () => navigate({ to: "/" }),
+    onSuccess: () => router.push("/"),
     onError: (err: Error) => setError(err.message),
   });
 
@@ -298,7 +297,7 @@ function CreateServerPage() {
                       No nodes available.{" "}
                       <Link
                         className="text-primary underline"
-                        to="/admin/nodes"
+                        href="/admin/nodes"
                       >
                         Add a node first.
                       </Link>
@@ -325,7 +324,7 @@ function CreateServerPage() {
                   <Alert>
                     <AlertDescription>
                       No eggs available.{" "}
-                      <Link className="text-primary underline" to="/admin/eggs">
+                      <Link className="text-primary underline" href="/admin/eggs">
                         Import an egg first.
                       </Link>
                     </AlertDescription>

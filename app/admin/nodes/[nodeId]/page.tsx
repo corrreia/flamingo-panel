@@ -1,5 +1,7 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
 import { StatusDot } from "@web/components/status-dot";
@@ -108,13 +110,9 @@ function MetricCard({
   );
 }
 
-export const Route = createFileRoute("/admin/nodes/$nodeId")({
-  component: NodeDetailPage,
-});
-
-function NodeDetailPage() {
-  const { nodeId } = Route.useParams();
-  const navigate = useNavigate();
+export default function NodeDetailPage({ params }: { params: { nodeId: string } }) {
+  const { nodeId } = params;
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -153,7 +151,7 @@ function NodeDetailPage() {
     mutationFn: () => api.delete(`/nodes/${nodeId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["nodes"] });
-      navigate({ to: "/admin/nodes" });
+      router.push("/admin/nodes");
     },
   });
 

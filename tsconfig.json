@@ -15,6 +15,6 @@
     },
     "types": ["./worker-configuration.d.ts"]
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "app", "worker"],
+  "exclude": ["node_modules", "dist", ".vinext"]
 }

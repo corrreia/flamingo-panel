@@ -1,5 +1,6 @@
+"use client";
+
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
 import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
 import { Badge } from "@web/components/ui/badge";
@@ -46,11 +47,7 @@ interface EggDetail extends EggItem {
   variables: EggVariable[];
 }
 
-export const Route = createFileRoute("/eggs")({
-  component: EggsPage,
-});
-
-function EggsPage() {
+export default function EggsPage() {
   const { data: eggs, isLoading } = useQuery({
     queryKey: ["eggs"],
     queryFn: () => api.get<EggItem[]>("/eggs"),

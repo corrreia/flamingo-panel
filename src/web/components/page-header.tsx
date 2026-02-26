@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { Button } from "@web/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
@@ -20,7 +20,7 @@ export function PageHeader({
       <div className="flex items-center gap-3">
         {backTo && (
           <Button asChild size="icon" variant="ghost">
-            <Link to={backTo}>
+            <Link href={backTo}>
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>

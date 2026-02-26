@@ -1,5 +1,7 @@
+"use client";
+
 import { useMutation } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
 import { Alert, AlertDescription } from "@web/components/ui/alert";
@@ -35,12 +37,8 @@ interface EggVariable {
   userViewable: boolean;
 }
 
-export const Route = createFileRoute("/admin/eggs/create")({
-  component: CreateEggPage,
-});
-
-function CreateEggPage() {
-  const navigate = useNavigate();
+export default function CreateEggPage() {
+  const router = useRouter();
   const [error, setError] = useState("");
 
   // Tab 1: Configuration
@@ -131,7 +129,7 @@ function CreateEggPage() {
   // Submit
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => api.post("/eggs", data),
-    onSuccess: () => navigate({ to: "/admin/eggs" }),
+    onSuccess: () => router.push("/admin/eggs"),
     onError: (err: Error) => setError(err.message),
   });
 

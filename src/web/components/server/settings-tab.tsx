@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,14 +28,14 @@ export function SettingsTab({
   serverId: string;
   serverName: string;
 }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/servers/${serverId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["servers"] });
-      navigate({ to: "/" });
+      router.push("/");
     },
   });
 

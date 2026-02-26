@@ -9,9 +9,9 @@ Default to using Bun instead of Node.js.
 ## Stack
 
 - **Runtime:** Cloudflare Workers (via `@cloudflare/vite-plugin` + Miniflare in dev)
-- **API:** Hono + Zod (all routes under `src/api/`)
-- **Frontend:** TanStack Start (SSR) + TanStack Router (file-based routing) + TanStack Query (data fetching)
+- **Frontend:** Vinext (Next.js App Router on Vite) + React Query (data fetching)
 - **UI:** React + Tailwind CSS v4 + shadcn/ui + Radix UI
+- **API:** Hono + Zod (all routes under `src/api/`)
 - **Database:** Cloudflare D1 via Drizzle ORM
 - **Sessions:** Cloudflare KV
 - **Storage:** Cloudflare R2
@@ -19,26 +19,29 @@ Default to using Bun instead of Node.js.
 
 ## Project Layout
 
-- `src/web/server.ts` — Worker entry point. Routes `/api/*` to Hono, everything else to TanStack Start SSR.
-- `src/web/routes/` — TanStack Router file-based routes (auto-generates `routeTree.gen.ts`)
-- `src/web/router.tsx` — Router config + QueryClient setup
+- `worker/index.ts` — Worker entry point. Routes `/api/*` to Hono, everything else to Vinext.
+- `app/` — Next.js App Router pages (via Vinext). Each route is a `page.tsx` file.
+- `app/layout.tsx` — Root layout (HTML shell, meta, CSS import)
+- `app/providers.tsx` — Client-side providers (QueryClient, AuthProvider)
 - `src/web/components/` — shadcn/ui components + Layout
 - `src/web/lib/` — Frontend utilities (API client, auth context)
+- `src/web/hooks/` — Custom React hooks (e.g. use-node-metrics)
 - `src/api/` — Hono API routes (auth, servers, nodes, eggs, files, remote, activity)
 - `src/lib/` — Shared utilities (auth, wings-client, wings-jwt, egg-import, activity)
 - `src/db/schema.ts` — Drizzle schema
 - `src/db/auth-schema.ts` — Better Auth tables (users, sessions, accounts, verifications)
 - `src/durable-objects/` — Durable Object classes (console-session, node-metrics)
 - `src/services/` — Service layer (api-keys, wings-payload)
-- `src/web/hooks/` — Custom React hooks (e.g. use-node-metrics)
+- `vite.config.ts` — Vite + Vinext + RSC + Cloudflare plugin config
 - `wrangler.jsonc` — Cloudflare Worker config (D1, KV, R2, DO bindings)
-- `vite.config.ts` — Vite + TanStack Start + Cloudflare plugin config
+- `next.config.ts` — Vinext/Next.js config (minimal)
 
 ## Scripts
 
-- `bun run dev` — Start dev server (Vite + Miniflare with all CF bindings)
-- `bun run build` — Production build (client + server bundles)
-- `bun run deploy` — Build + deploy to Cloudflare
+- `bun run dev` — Start dev server (Vinext + Miniflare with all CF bindings)
+- `bun run build` — Production build (RSC + SSR + client bundles)
+- `bun run start` — Start local production server
+- `bun run deploy` — Build + deploy to Cloudflare Workers
 - `bun run test` — Run Vitest tests
 - `bun run lint` — Biome lint
 - `bun run format` — Biome auto-format
@@ -46,10 +49,12 @@ Default to using Bun instead of Node.js.
 
 ## Frontend Conventions
 
-- Routes go in `src/web/routes/` using TanStack Router file-based routing
+- Routes go in `app/` using Next.js App Router conventions (`page.tsx`, `layout.tsx`)
+- Use `"use client"` directive for pages that use hooks (most pages)
+- Use `<Link href="...">` from `next/link` for navigation
+- Use `useRouter()` from `next/navigation` for programmatic navigation
+- Use `useParams()` from `next/navigation` or page `params` prop for route params
 - Use `useQuery` / `useMutation` from TanStack Query for all data fetching — not `useEffect` + `useState`
-- Use `<Link to="...">` from `@tanstack/react-router` for navigation — not `<a href>`
-- Use `useNavigate()` for programmatic navigation
 - Use `queryClient.invalidateQueries()` after mutations to refresh data
 - Wrap authenticated pages in `<Layout>` component
 - Access CF bindings in server code via `import { env } from "cloudflare:workers"`
@@ -60,6 +65,7 @@ Default to using Bun instead of Node.js.
 - Auth middleware at `src/api/middleware/auth.ts`
 - Zod for request validation
 - Wings communication via `src/lib/wings-client.ts`
+- API routes are NOT in `app/api/` — Hono handles all `/api/*` requests via the worker entry
 
 ## Code Quality
 

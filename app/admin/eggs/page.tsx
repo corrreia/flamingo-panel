@@ -1,5 +1,7 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { CodeEditor } from "@web/components/code-editor";
 import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
@@ -55,15 +57,9 @@ interface EggItem {
   variableCount?: number;
 }
 
-// ── Route ───────────────────────────────────────────────────────────
-
-export const Route = createFileRoute("/admin/eggs/")({
-  component: EggsPage,
-});
-
 // ── Page ────────────────────────────────────────────────────────────
 
-function EggsPage() {
+export default function EggsPage() {
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
   const [error, setError] = useState("");
@@ -200,7 +196,7 @@ function EggsPage() {
                 </DialogContent>
               </Dialog>
               <Button asChild>
-                <Link to="/admin/eggs/create">
+                <Link href="/admin/eggs/create">
                   <Plus className="mr-2 h-4 w-4" /> Create Egg
                 </Link>
               </Button>
@@ -343,8 +339,7 @@ function EggRow({
         <div className="min-w-0">
           <Link
             className="font-medium hover:underline"
-            params={{ eggId: egg.id }}
-            to="/admin/eggs/$eggId"
+            href={`/admin/eggs/${egg.id}`}
           >
             {egg.name}
           </Link>

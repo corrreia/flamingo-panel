@@ -35,6 +35,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 .wrangler/
 .tanstack/
+.vinext/
+.next/
 docs/plans/*
 # Localflare generated files
 .localflare/

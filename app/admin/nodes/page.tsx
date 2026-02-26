@@ -1,5 +1,7 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
@@ -95,7 +97,7 @@ function NodeRow({
   return (
     <TableRow>
       <TableCell className="font-mono text-muted-foreground">
-        <Link params={{ nodeId: String(node.id) }} to="/admin/nodes/$nodeId">
+        <Link href={`/admin/nodes/${node.id}`}>
           {node.id}
         </Link>
       </TableCell>
@@ -104,8 +106,7 @@ function NodeRow({
           <StatusDot status={metrics.wingsOnline ? "online" : "offline"} />
           <Link
             className="font-medium hover:underline"
-            params={{ nodeId: String(node.id) }}
-            to="/admin/nodes/$nodeId"
+            href={`/admin/nodes/${node.id}`}
           >
             {node.name}
           </Link>
@@ -197,11 +198,7 @@ function NodesList({
   );
 }
 
-export const Route = createFileRoute("/admin/nodes/")({
-  component: NodesPage,
-});
-
-function NodesPage() {
+export default function NodesPage() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
