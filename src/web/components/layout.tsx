@@ -28,6 +28,14 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+/**
+ * Root application layout that renders the top navigation, user menu, responsive mobile sheet, and main content area.
+ *
+ * Renders primary navigation links, conditionally shows admin controls when the current user has the "admin" role, and automatically closes the mobile menu when the route changes.
+ *
+ * @param children - Content to render inside the main content area of the layout
+ * @returns The composed layout element containing navigation, the mobile sheet, and the provided main content
+ */
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);

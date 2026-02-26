@@ -64,6 +64,13 @@ interface UserItem {
   username: string;
 }
 
+/**
+ * Admin page that displays a paginated, filterable activity log.
+ *
+ * Renders controls to filter entries by server, node, user, and event text, shows a loading skeleton while data is being fetched, and presents activity rows with server links, user and IP information, timestamps, and an empty-state message when no entries exist. Includes client-side pagination and a clear-filters action that resets filters and page.
+ *
+ * @returns The rendered Activity Log page element
+ */
 export default function ActivityLogPage() {
   const [page, setPage] = useState(0);
   const [serverId, setServerId] = useState<string>("");

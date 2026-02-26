@@ -62,6 +62,13 @@ interface EggDetail extends EggItem {
   variables: EggVariable[];
 }
 
+/**
+ * Get CSS class names for a wizard step based on its index relative to the current step.
+ *
+ * @param i - The index of the step being rendered
+ * @param step - The index of the current active step
+ * @returns The CSS class string representing the step state: active ("bg-primary text-primary-foreground"), completed ("bg-primary/20 text-primary"), or pending ("bg-muted text-muted-foreground")
+ */
 function getStepClassName(i: number, step: number): string {
   if (i === step) {
     return "bg-primary text-primary-foreground";
@@ -72,7 +79,15 @@ function getStepClassName(i: number, step: number): string {
   return "bg-muted text-muted-foreground";
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-step wizard component
+/**
+ * Renders a multi-step "Create Server" wizard page allowing admins to configure and create a server.
+ *
+ * The component fetches users, nodes, and eggs, manages form state across five steps (Basics, Node & Egg,
+ * Resources, Variables, Review), validates required fields per step, and submits a create request to the API.
+ * On successful creation the page navigates to the root ("/"); errors are displayed as an alert.
+ *
+ * @returns The rendered Create Server page UI
+ */
 export default function CreateServerPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);

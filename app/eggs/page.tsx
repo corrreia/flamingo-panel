@@ -47,6 +47,11 @@ interface EggDetail extends EggItem {
   variables: EggVariable[];
 }
 
+/**
+ * Page component that displays the Eggs list and its loading state, sourcing eggs from the `/eggs` API.
+ *
+ * @returns The page element rendering a header and the eggs list inside the application layout.
+ */
 export default function EggsPage() {
   const { data: eggs, isLoading } = useQuery({
     queryKey: ["eggs"],

@@ -61,6 +61,13 @@ interface NodeMetricsReport {
   wingsOnline: boolean;
 }
 
+/**
+ * Render a table row for a node and notify the parent when the node's metrics change.
+ *
+ * @param node - The node to render (id, name, url, createdAt).
+ * @param onMetrics - Callback invoked with a `NodeMetricsReport` whenever the node's reported metrics change.
+ * @returns A table row element displaying the node's id, name, URL, and current CPU/memory/disk metrics.
+ */
 function NodeRow({
   node,
   onMetrics,
@@ -140,6 +147,17 @@ function NodeRow({
   );
 }
 
+/**
+ * Render the nodes list area with loading, data, and empty states.
+ *
+ * Renders skeleton rows when `isLoading` is true, a table of nodes when `nodes` contains items,
+ * and an empty-state prompt when there are no nodes.
+ *
+ * @param nodes - Array of node items to display, or `undefined` if not loaded
+ * @param isLoading - Whether the node list is currently loading
+ * @param onNodeMetrics - Callback invoked with a `NodeMetricsReport` when a child `NodeRow` reports metrics
+ * @returns The rendered React element for the nodes list area (skeletons, table of nodes, or empty state)
+ */
 function NodesList({
   nodes,
   isLoading,
@@ -198,6 +216,13 @@ function NodesList({
   );
 }
 
+/**
+ * Render the Nodes management page, including node listing, add-node flow, and aggregated metrics.
+ *
+ * Renders UI for viewing existing Wings nodes, creating a new node (with dialogs for input and post-creation command), and displaying aggregated CPU, memory, and disk statistics collected from per-node metrics.
+ *
+ * @returns The React element for the Nodes page.
+ */
 export default function NodesPage() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);

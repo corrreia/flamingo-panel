@@ -37,6 +37,16 @@ interface EggVariable {
   userViewable: boolean;
 }
 
+/**
+ * Renders the "Create Egg" page: a multi-tab form for configuring a new Egg and submitting it to the API.
+ *
+ * The form includes tabs for Configuration (metadata, docker images, denylist), Process Management (startup/stop commands and configs),
+ * Variables (define environment variables and permissions), and Install Script (installer container, entry, and script). Handles local
+ * validation, assembles a payload from the form state, and posts to the /eggs endpoint; on success it navigates to the eggs list and on
+ * error surfaces an error message.
+ *
+ * @returns The React element for the Create Egg page.
+ */
 export default function CreateEggPage() {
   const router = useRouter();
   const [error, setError] = useState("");

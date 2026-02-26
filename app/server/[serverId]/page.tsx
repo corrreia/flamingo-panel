@@ -73,6 +73,12 @@ interface ServerDetail {
   uuid: string;
 }
 
+/**
+ * Selects a UI badge variant representing the server's operational status.
+ *
+ * @param s - The server detail used to determine the status variant
+ * @returns `default` if the server is running, `destructive` if the server's status is `install_failed`, `secondary` otherwise
+ */
 function getStatusVariant(
   s: ServerDetail
 ): "default" | "destructive" | "secondary" {
@@ -85,6 +91,12 @@ function getStatusVariant(
   return "secondary";
 }
 
+/**
+ * Compute a human-readable status label for a server.
+ *
+ * @param s - The server detail object used to determine the label
+ * @returns `Installing` if `s.status` is `"installing"`, `Install Failed` if `s.status` is `"install_failed"`, otherwise `s.containerStatus` if present, else `s.resources?.state` if present, else `"offline"`
+ */
 function getStatusLabel(s: ServerDetail): string {
   if (s.status === "installing") {
     return "Installing";
@@ -95,6 +107,15 @@ function getStatusLabel(s: ServerDetail): string {
   return s.containerStatus || s.resources?.state || "offline";
 }
 
+/**
+ * Renders the server dashboard page for a given server, including status badge, resource utilization, and tabbed sections (Console, Files, Activity, Settings, Users).
+ *
+ * Fetches server details and updates them every 10 seconds; shows loading and "Server not found." states when appropriate. Management-only tabs (Settings, Users) are shown for users with role "owner" or "admin".
+ *
+ * @param params - Route parameters object
+ * @param params.serverId - The ID of the server to display
+ * @returns The React element rendering the server dashboard for the specified server
+ */
 export default function ServerPage({ params }: { params: { serverId: string } }) {
   const { serverId } = params;
 

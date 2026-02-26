@@ -13,6 +13,15 @@ import { LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+/**
+ * Render the client-side login page and redirect authenticated users to the root path.
+ *
+ * The page displays a centered card with a title, description, and a "Sign in with SSO" button
+ * that invokes the authentication flow. If a user is already authenticated, the component
+ * navigates to "/".
+ *
+ * @returns The React element for the login page.
+ */
 export default function LoginPage() {
 	const router = useRouter();
 	const { user, login } = useAuth();

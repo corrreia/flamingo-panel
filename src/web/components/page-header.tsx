@@ -9,6 +9,15 @@ interface PageHeaderProps {
   title: string;
 }
 
+/**
+ * Render a responsive page header with an optional back button, title, inline children, and actions area.
+ *
+ * @param title - The header title text.
+ * @param backTo - Optional destination URL for the back button; when omitted no back button is rendered.
+ * @param actions - Optional React node(s) rendered on the right side as action controls.
+ * @param children - Optional React node(s) rendered inline next to the title (for badges or supplementary content).
+ * @returns A React element representing the page header layout.
+ */
 export function PageHeader({
   title,
   backTo,

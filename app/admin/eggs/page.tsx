@@ -57,7 +57,13 @@ interface EggItem {
   variableCount?: number;
 }
 
-// ── Page ────────────────────────────────────────────────────────────
+/**
+ * Renders the Eggs administration page which displays a searchable list of eggs and provides import, export, create, and delete actions.
+ *
+ * The page fetches egg data, derives a filtered list from the search input, and exposes UI for importing eggs (paste or upload), exporting individual eggs as JSON, creating a new egg, and deleting existing eggs.
+ *
+ * @returns The JSX element for the Eggs administration interface.
+ */
 
 export default function EggsPage() {
   const queryClient = useQueryClient();
@@ -312,7 +318,14 @@ function EggsList({
   );
 }
 
-// ── Egg Row ─────────────────────────────────────────────────────────
+/**
+ * Render a table row for an egg, displaying name, optional description, docker image, and actions to export or delete the egg.
+ *
+ * @param egg - The egg item to render.
+ * @param onExport - Callback invoked with the egg `id` and `name` when the export action is triggered.
+ * @param onDelete - Callback invoked with the egg `id` after a successful deletion.
+ * @returns The table row JSX element representing the egg and its actions.
+ */
 
 function EggRow({
   egg,

@@ -85,6 +85,15 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/**
+ * Render a compact metric card showing an icon, label, main value, and optional subtext.
+ *
+ * @param icon - Visual icon displayed to the left of the label
+ * @param label - Small muted label shown above the value
+ * @param value - Prominent monospaced value displayed as the card's main content
+ * @param sub - Optional muted subtext rendered below the value
+ * @returns A React element representing the metric card
+ */
 function MetricCard({
   icon,
   label,
@@ -110,6 +119,16 @@ function MetricCard({
   );
 }
 
+/**
+ * Render the node detail page for a given node ID.
+ *
+ * Displays node metadata, live metrics, overview details, and settings (edit name/URL,
+ * generate Wings configure command, and delete node). Handles fetching node data,
+ * live metrics, and mutations to save, reconfigure, and delete the node.
+ *
+ * @param params - Route parameters containing the `nodeId` of the node to display
+ * @returns The complete React element for the node detail page UI
+ */
 export default function NodeDetailPage({ params }: { params: { nodeId: string } }) {
   const { nodeId } = params;
   const router = useRouter();

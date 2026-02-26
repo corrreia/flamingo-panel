@@ -90,7 +90,12 @@ interface VariableEntry {
   userViewable: boolean;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────
+/**
+ * Parse a JSON object string that maps image labels to image references into an array of entries.
+ *
+ * @param raw - A JSON object string mapping label -> image (for example: `{"alpine":"alpine:latest"}`); may be null.
+ * @returns An array of DockerImageEntry objects with `label` and `image`; returns an empty array if `raw` is null, empty, or not valid JSON.
+ */
 
 function parseDockerImages(raw: string | null): DockerImageEntry[] {
   if (!raw) {
@@ -116,7 +121,15 @@ function parseCsv(raw: string | null): string {
   }
 }
 
-// ── Component ──────────────────────────────────────────────────────
+/**
+ * Admin page for viewing and editing an Egg's configuration, variables, and install script.
+ *
+ * Populates an editable form from the egg identified by `params.eggId`, and provides controls to
+ * update or delete the egg via API mutations.
+ *
+ * @param params - Route parameters object containing the `eggId` of the egg to edit.
+ * @returns The React component tree for the Edit Egg admin page.
+ */
 
 export default function EditEggPage({ params }: { params: { eggId: string } }) {
   const { eggId } = params;

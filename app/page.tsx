@@ -27,6 +27,12 @@ interface ServerItem {
 	uuid: string;
 }
 
+/**
+ * Selects the visual variant for a server status badge.
+ *
+ * @param s - The server item whose status determines the badge variant
+ * @returns `default` when the server's container is running, `destructive` when installation failed, `secondary` otherwise
+ */
 function getStatusVariant(
 	s: ServerItem,
 ): "default" | "destructive" | "secondary" {
@@ -39,6 +45,12 @@ function getStatusVariant(
 	return "secondary";
 }
 
+/**
+ * Determine the human-facing status label for a server.
+ *
+ * @param s - The server object to derive the label from
+ * @returns `Installing` if the server is installing, `Install Failed` if installation failed, otherwise the server's container status string or `offline` if none is available
+ */
 function getStatusLabel(s: ServerItem): string {
 	if (s.status === "installing") {
 		return "Installing";
@@ -49,6 +61,16 @@ function getStatusLabel(s: ServerItem): string {
 	return s.containerStatus || "offline";
 }
 
+/**
+ * Render the client-side dashboard page that displays the user's servers.
+ *
+ * Fetches server data from the API (refetching every 15 seconds), shows loading
+ * skeletons while fetching, renders a responsive grid of server cards linking
+ * to each server's detail page, and displays an empty state when no servers
+ * exist.
+ *
+ * @returns The dashboard page as a JSX element
+ */
 export default function DashboardPage() {
 	const { data: servers, isLoading } = useQuery({
 		queryKey: ["servers"],

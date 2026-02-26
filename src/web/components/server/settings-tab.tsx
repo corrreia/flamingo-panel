@@ -21,6 +21,17 @@ import {
 import { api } from "@web/lib/api";
 import { Trash2 } from "lucide-react";
 
+/**
+ * Renders the Settings tab containing a "Danger Zone" card that allows deletion of a server.
+ *
+ * The component shows explanatory text and a confirmation dialog; confirming deletion sends a
+ * DELETE request for the provided `serverId`, invalidates the cached "servers" query, and
+ * navigates to the application root on success.
+ *
+ * @param serverId - The identifier of the server to delete.
+ * @param serverName - The display name used in the confirmation dialog.
+ * @returns The settings tab UI as a React element.
+ */
 export function SettingsTab({
   serverId,
   serverName,
