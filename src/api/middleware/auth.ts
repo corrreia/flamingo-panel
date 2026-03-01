@@ -1,5 +1,8 @@
 import { createMiddleware } from "hono/factory";
 import { createAuth } from "../../lib/auth";
+import { createLogger } from "../../lib/logger";
+
+const logger = createLogger("api", "auth");
 
 export interface AuthUser {
   email: string;
@@ -21,6 +24,10 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
   });
 
   if (!session) {
+    logger.warn("auth failed: no session", {
+      path: c.req.path,
+      ip: c.req.header("cf-connecting-ip"),
+    });
     return c.json({ error: "Unauthorized" }, 401);
   }
 
@@ -37,6 +44,10 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
 export const requireAdmin = createMiddleware<AuthEnv>(async (c, next) => {
   const user = c.get("user");
   if (!user || user.role !== "admin") {
+    logger.warn("auth failed: not admin", {
+      userId: user?.id,
+      path: c.req.path,
+    });
     return c.json({ error: "Admin access required" }, 403);
   }
   await next();
