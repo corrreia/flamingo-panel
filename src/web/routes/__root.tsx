@@ -8,8 +8,6 @@ import {
 } from "@tanstack/react-router";
 import appCss from "@web/index.css?url";
 import { AuthProvider } from "@web/lib/auth";
-import { initClientErrorCapture } from "@web/lib/client-logger";
-import { useEffect } from "react";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -45,11 +43,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
-  useEffect(() => {
-    initClientErrorCapture();
-  }, []);
-
   return (
     <RootDocument>
       <QueryClientProvider client={queryClient}>

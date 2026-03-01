@@ -1,5 +1,3 @@
-import { logClientError } from "./client-logger";
-
 const BASE = "/api";
 
 async function request<T>(
@@ -23,9 +21,7 @@ async function request<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Request failed" }));
-    const err = new Error(error.error || "Request failed");
-    logClientError("api.error", err, { method, path, status: res.status });
-    throw err;
+    throw new Error(error.error || "Request failed");
   }
 
   if (res.status === 204) {
