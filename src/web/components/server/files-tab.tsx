@@ -60,6 +60,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { DRAG_MIME } from "./file-manager/file-table";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -453,6 +454,26 @@ export function FilesTab({ serverId }: { serverId: string }) {
     [fm.clearSelection]
   );
 
+  const handleMoveToDir = useCallback(
+    (fileNames: string[], sourceDir: string, targetDir: string) => {
+      if (sourceDir === targetDir) {
+        return;
+      }
+      fm.renameMutation.mutate({
+        root: "/",
+        files: fileNames.map((name) => ({
+          from: joinPath(sourceDir, name).substring(1),
+          to: joinPath(targetDir, name).substring(1),
+        })),
+      });
+    },
+    [fm.renameMutation]
+  );
+
+  // Breadcrumb drop-zone state
+  const [dragOverCrumb, setDragOverCrumb] = useState<string | null>(null);
+  const crumbCounters = useRef<Record<string, number>>({});
+
   const openFile = useCallback(
     async (fileName: string) => {
       const filePath = joinPath(currentDir, fileName);
@@ -563,8 +584,36 @@ export function FilesTab({ serverId }: { serverId: string }) {
               </Button>
             )}
             <button
-              className="font-mono text-muted-foreground text-xs transition-colors hover:text-foreground"
+              className={`rounded px-1 font-mono text-muted-foreground text-xs transition-colors hover:text-foreground ${dragOverCrumb === "/" ? "bg-primary/10 text-primary ring-2 ring-primary" : ""}`}
               onClick={() => navigateDir("/")}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                crumbCounters.current["/"] = (crumbCounters.current["/"] ?? 0) + 1;
+                if (crumbCounters.current["/"] === 1) {
+                  setDragOverCrumb("/");
+                }
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                crumbCounters.current["/"] = (crumbCounters.current["/"] ?? 1) - 1;
+                if (crumbCounters.current["/"] === 0) {
+                  setDragOverCrumb(null);
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                crumbCounters.current["/"] = 0;
+                setDragOverCrumb(null);
+                const raw = e.dataTransfer.getData(DRAG_MIME);
+                if (raw) {
+                  const data = JSON.parse(raw);
+                  handleMoveToDir(data.files, data.sourceDir, "/");
+                }
+              }}
               type="button"
             >
               /
@@ -578,8 +627,36 @@ export function FilesTab({ serverId }: { serverId: string }) {
                   </span>
                 ) : (
                   <button
-                    className="font-mono text-muted-foreground text-xs transition-colors hover:text-foreground"
+                    className={`rounded px-1 font-mono text-muted-foreground text-xs transition-colors hover:text-foreground ${dragOverCrumb === crumb.path ? "bg-primary/10 text-primary ring-2 ring-primary" : ""}`}
                     onClick={() => navigateDir(crumb.path)}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      crumbCounters.current[crumb.path] = (crumbCounters.current[crumb.path] ?? 0) + 1;
+                      if (crumbCounters.current[crumb.path] === 1) {
+                        setDragOverCrumb(crumb.path);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      crumbCounters.current[crumb.path] = (crumbCounters.current[crumb.path] ?? 1) - 1;
+                      if (crumbCounters.current[crumb.path] === 0) {
+                        setDragOverCrumb(null);
+                      }
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      crumbCounters.current[crumb.path] = 0;
+                      setDragOverCrumb(null);
+                      const raw = e.dataTransfer.getData(DRAG_MIME);
+                      if (raw) {
+                        const data = JSON.parse(raw);
+                        handleMoveToDir(data.files, data.sourceDir, crumb.path);
+                      }
+                    }}
                     type="button"
                   >
                     {crumb.label}
@@ -618,6 +695,7 @@ export function FilesTab({ serverId }: { serverId: string }) {
                   e.preventDefault();
                   setContextMenu({ file, x: e.clientX, y: e.clientY });
                 }}
+                onMoveToDir={handleMoveToDir}
                 onNavigate={navigateDir}
                 onOpen={openFile}
                 onSelectAll={() => {
@@ -628,6 +706,11 @@ export function FilesTab({ serverId }: { serverId: string }) {
                   }
                 }}
                 onToggleSelect={fm.toggleSelect}
+                parentDir={
+                  currentDir !== "/"
+                    ? currentDir.replace(PARENT_DIR_RE, "") || "/"
+                    : null
+                }
                 selection={fm.selection}
               />
             )}
