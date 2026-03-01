@@ -69,7 +69,28 @@ fileRoutes.get("/:serverId/files/contents", async (c) => {
   });
 });
 
-// Write file
+// Download file (Content-Disposition: attachment)
+fileRoutes.get("/:serverId/files/download", async (c) => {
+  const result = await getServerAndClient(c);
+  if ("error" in result) {
+    return result.error;
+  }
+  const file = c.req.query("file");
+  if (!file) {
+    return c.json({ error: "file parameter required" }, 400);
+  }
+  const fileName = file.split("/").pop() || file;
+  const res = await result.client.getFileContents(result.server.uuid, file);
+  return new Response(res.body, {
+    headers: {
+      "Content-Type":
+        res.headers.get("Content-Type") || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+    },
+  });
+});
+
+// Write file (supports both text and binary uploads)
 fileRoutes.post("/:serverId/files/write", async (c) => {
   const result = await getServerAndClient(c);
   if ("error" in result) {
@@ -79,7 +100,10 @@ fileRoutes.post("/:serverId/files/write", async (c) => {
   if (!file) {
     return c.json({ error: "file parameter required" }, 400);
   }
-  const body = await c.req.text();
+  const body = c.req.raw.body;
+  if (!body) {
+    return c.json({ error: "Request body required" }, 400);
+  }
   await result.client.writeFile(result.server.uuid, file, body);
   logActivity(c, {
     event: "file:write",
