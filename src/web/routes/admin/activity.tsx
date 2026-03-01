@@ -27,6 +27,21 @@ import { api } from "@web/lib/api";
 import { ClipboardList, X } from "lucide-react";
 import { useState } from "react";
 
+function formatValue(v: unknown): string {
+  if (v === null || v === undefined) {
+    return "";
+  }
+  if (Array.isArray(v)) {
+    return v.map(formatValue).join(", ");
+  }
+  if (typeof v === "object") {
+    return Object.entries(v)
+      .map(([k, val]) => `${k}: ${formatValue(val)}`)
+      .join(", ");
+  }
+  return String(v);
+}
+
 function formatMetadata(raw: string | null): string {
   if (!raw || raw === "{}") {
     return "";
@@ -34,7 +49,7 @@ function formatMetadata(raw: string | null): string {
   try {
     const obj = JSON.parse(raw) as Record<string, unknown>;
     return Object.entries(obj)
-      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`)
+      .map(([k, v]) => `${k}: ${formatValue(v)}`)
       .join(" \u00b7 ");
   } catch {
     return "";
