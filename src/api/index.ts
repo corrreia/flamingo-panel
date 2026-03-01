@@ -8,6 +8,7 @@ import { applicationRoutes } from "./application";
 import { authRoutes } from "./auth";
 import { eggRoutes } from "./eggs";
 import { fileRoutes } from "./files";
+import { logRoutes } from "./logs";
 import { requireAdmin, requireAuth } from "./middleware/auth";
 import { errorHandler, requestLogger } from "./middleware/request-logger";
 import { nodeRoutes } from "./nodes";
@@ -122,6 +123,7 @@ apiRoutes.route("/servers", subuserRoutes); // mounts /:serverId/subusers/*
 apiRoutes.route("/eggs", eggRoutes);
 apiRoutes.route("/remote", remoteRoutes);
 apiRoutes.route("/application", applicationRoutes);
+apiRoutes.route("/logs", logRoutes);
 
 // Admin: list users (for server creation wizard)
 apiRoutes.get("/users", requireAuth, requireAdmin, async (c) => {
