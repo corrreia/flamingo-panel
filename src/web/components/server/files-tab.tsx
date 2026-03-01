@@ -31,8 +31,16 @@ import {
 import { api } from "@web/lib/api";
 import { flamingoDark } from "@web/lib/codemirror-theme";
 import { formatBytes } from "@web/lib/format";
-import { ArrowLeft, ChevronRight, File, Folder, Save, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  File,
+  Folder,
+  FolderOpen,
+  Save,
+  X,
+} from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 interface FileEntry {
   directory: boolean;
@@ -107,6 +115,88 @@ function getLanguageExtension(filePath: string): Extension[] {
   }
 }
 
+const MAC_RE = /Mac|iPod|iPhone|iPad/;
+
+function joinPath(dir: string, name: string): string {
+  return dir === "/" ? `/${name}` : `${dir}/${name}`;
+}
+
+function getAriaLabel(f: FileEntry): string {
+  if (f.directory) {
+    return `Open folder ${f.name}`;
+  }
+  if (isTextFile(f.name)) {
+    return `Edit file ${f.name}`;
+  }
+  return f.name;
+}
+
+function FileRow({
+  currentDir,
+  file,
+  onNavigate,
+  onOpen,
+}: {
+  currentDir: string;
+  file: FileEntry;
+  onNavigate: (dir: string) => void;
+  onOpen: (name: string) => void;
+}) {
+  const isClickable = file.directory || isTextFile(file.name);
+  const handleActivate = () => {
+    if (file.directory) {
+      onNavigate(joinPath(currentDir, file.name));
+    } else if (isTextFile(file.name)) {
+      onOpen(file.name);
+    }
+  };
+
+  return (
+    <TableRow
+      aria-label={getAriaLabel(file)}
+      className={isClickable ? "cursor-pointer hover:bg-accent" : ""}
+      onClick={handleActivate}
+      onKeyDown={(e) => {
+        if (isClickable && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          handleActivate();
+        }
+      }}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+    >
+      <TableCell className="flex items-center gap-2">
+        {file.directory ? (
+          <Folder className="h-4 w-4 shrink-0 text-primary" />
+        ) : (
+          <File className="h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+        <span className="truncate">{file.name}</span>
+        {file.directory && (
+          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+        )}
+      </TableCell>
+      <TableCell className="hidden text-right text-muted-foreground sm:table-cell">
+        {file.directory ? "\u2014" : formatBytes(file.size)}
+      </TableCell>
+      <TableCell className="hidden text-right text-muted-foreground text-xs sm:table-cell">
+        {new Date(file.modified).toLocaleString()}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/** Build clickable breadcrumb segments from a path like "/plugins/config". */
+function buildBreadcrumbs(path: string): { label: string; path: string }[] {
+  if (path === "/") {
+    return [];
+  }
+  const parts = path.split("/").filter(Boolean);
+  return parts.map((part, i) => ({
+    label: part,
+    path: `/${parts.slice(0, i + 1).join("/")}`,
+  }));
+}
 
 export function FilesTab({ serverId }: { serverId: string }) {
   const [currentDir, setCurrentDir] = useState("/");
@@ -180,20 +270,13 @@ export function FilesTab({ serverId }: { serverId: string }) {
     []
   );
 
-  const navigateUp = () => {
-    const parent = currentDir.replace(PARENT_DIR_RE, "") || "/";
-    setCurrentDir(parent);
-    setEditingFile(null);
-  };
-
-  const navigateDir = (dir: string) => {
+  const navigateDir = useCallback((dir: string) => {
     setCurrentDir(dir);
     setEditingFile(null);
-  };
+  }, []);
 
   const openFile = async (fileName: string) => {
-    const filePath =
-      currentDir === "/" ? `/${fileName}` : `${currentDir}/${fileName}`;
+    const filePath = joinPath(currentDir, fileName);
     setLoadingFile(true);
     setSaveStatus("");
     try {
@@ -229,56 +312,76 @@ export function FilesTab({ serverId }: { serverId: string }) {
     setEditingFile(null);
   };
 
+  const breadcrumbs = buildBreadcrumbs(currentDir);
+  const isMac =
+    typeof navigator !== "undefined" && MAC_RE.test(navigator.userAgent);
+  const saveShortcut = isMac ? "\u2318S" : "Ctrl+S";
+
+  // ── File editor view ──────────────────────────────────────────────
   if (editingFile) {
     const fileName = editingFile.split("/").pop() || editingFile;
     return (
       <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={closeEditor} size="sm" variant="ghost">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2">
+              <Button
+                aria-label="Close editor"
+                onClick={closeEditor}
+                size="sm"
+                variant="ghost"
+              >
                 <X className="h-4 w-4" />
               </Button>
-              <File className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">{fileName}</CardTitle>
-              <Badge className="font-mono text-xs" variant="secondary">
-                {editingFile}
-              </Badge>
+              <File className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <CardTitle className="truncate text-base">{fileName}</CardTitle>
               {fileContent !== originalContent && (
-                <Badge className="text-xs" variant="default">
+                <Badge className="shrink-0 text-xs" variant="default">
                   Modified
                 </Badge>
               )}
               {saveStatus === "saved" && (
-                <Badge className="text-xs" variant="secondary">
+                <Badge className="shrink-0 text-xs" variant="secondary">
                   Saved
                 </Badge>
               )}
               {saveStatus === "error" && (
-                <Badge className="text-xs" variant="destructive">
+                <Badge className="shrink-0 text-xs" variant="destructive">
                   Save failed
                 </Badge>
               )}
             </div>
-            <Button
-              disabled={
-                saveMutation.isPending || fileContent === originalContent
-              }
-              onClick={() =>
-                saveMutation.mutate({ file: editingFile, content: fileContent })
-              }
-              size="sm"
-            >
-              <Save className="mr-1 h-4 w-4" />{" "}
-              {saveMutation.isPending ? "Saving..." : "Save"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <span className="hidden text-muted-foreground text-xs sm:inline">
+                {saveShortcut}
+              </span>
+              <Button
+                disabled={
+                  saveMutation.isPending || fileContent === originalContent
+                }
+                onClick={() =>
+                  saveMutation.mutate({
+                    file: editingFile,
+                    content: fileContent,
+                  })
+                }
+                size="sm"
+              >
+                <Save className="mr-1.5 h-4 w-4" />
+                {saveMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
           </div>
+          <p className="font-mono text-muted-foreground text-xs">
+            {editingFile}
+          </p>
         </CardHeader>
         <CardContent>
           {loadingFile ? (
-            <Skeleton className="h-80" />
+            <Skeleton className="h-96" />
           ) : (
             <CodeMirror
+              aria-label={`Editing ${fileName}`}
               basicSetup={{
                 lineNumbers: true,
                 foldGutter: true,
@@ -287,9 +390,9 @@ export function FilesTab({ serverId }: { serverId: string }) {
                 bracketMatching: true,
                 autocompletion: false,
               }}
-              className="overflow-hidden rounded-md border"
+              className="overflow-hidden rounded-lg border border-border/50"
               extensions={[saveKeymap, ...getLanguageExtension(editingFile)]}
-              height="384px"
+              height="28rem"
               onChange={(value) => {
                 setFileContent(value);
                 setSaveStatus("");
@@ -303,29 +406,76 @@ export function FilesTab({ serverId }: { serverId: string }) {
     );
   }
 
+  // ── File browser view ─────────────────────────────────────────────
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base">Files</CardTitle>
-          <Badge className="font-mono text-xs" variant="secondary">
-            {currentDir}
-          </Badge>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <CardTitle className="text-base">Files</CardTitle>
+          </div>
+          <p className="hidden text-muted-foreground text-xs sm:block">
+            Click a file to edit
+          </p>
+        </div>
+        {/* Breadcrumb navigation */}
+        <nav aria-label="File path" className="flex items-center gap-1 text-sm">
           {currentDir !== "/" && (
-            <Button onClick={navigateUp} size="sm" variant="ghost">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Back
+            <Button
+              aria-label="Navigate to parent directory"
+              className="mr-1 h-7 w-7"
+              onClick={() => {
+                const parent = currentDir.replace(PARENT_DIR_RE, "") || "/";
+                navigateDir(parent);
+              }}
+              size="icon"
+              variant="ghost"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
             </Button>
           )}
-        </div>
+          <button
+            className="font-mono text-muted-foreground text-xs transition-colors hover:text-foreground"
+            onClick={() => navigateDir("/")}
+            type="button"
+          >
+            /
+          </button>
+          {breadcrumbs.map((crumb, i) => (
+            <span className="flex items-center gap-1" key={crumb.path}>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+              {i === breadcrumbs.length - 1 ? (
+                <span className="font-mono text-foreground text-xs">
+                  {crumb.label}
+                </span>
+              ) : (
+                <button
+                  className="font-mono text-muted-foreground text-xs transition-colors hover:text-foreground"
+                  onClick={() => navigateDir(crumb.path)}
+                  type="button"
+                >
+                  {crumb.label}
+                </button>
+              )}
+            </span>
+          ))}
+        </nav>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isLoading && (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
               <Skeleton className="h-10" key={i} />
             ))}
           </div>
-        ) : (
+        )}
+        {!isLoading && files?.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
+            <FolderOpen className="h-10 w-10" />
+            <p className="text-sm">This directory is empty</p>
+          </div>
+        )}
+        {!isLoading && files && files.length > 0 && (
           <Table>
             <TableHeader>
               <TableRow>
@@ -339,55 +489,15 @@ export function FilesTab({ serverId }: { serverId: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {files?.map((f) => (
-                <TableRow
-                  className={
-                    f.directory || isTextFile(f.name)
-                      ? "cursor-pointer hover:bg-accent"
-                      : ""
-                  }
+              {files.map((f) => (
+                <FileRow
+                  currentDir={currentDir}
+                  file={f}
                   key={f.name}
-                  onClick={() => {
-                    if (f.directory) {
-                      navigateDir(
-                        currentDir === "/"
-                          ? `/${f.name}`
-                          : `${currentDir}/${f.name}`
-                      );
-                    } else if (isTextFile(f.name)) {
-                      openFile(f.name);
-                    }
-                  }}
-                >
-                  <TableCell className="flex items-center gap-2">
-                    {f.directory ? (
-                      <Folder className="h-4 w-4 text-primary" />
-                    ) : (
-                      <File className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    {f.name}
-                    {f.directory && (
-                      <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden text-right text-muted-foreground sm:table-cell">
-                    {f.directory ? "-" : formatBytes(f.size)}
-                  </TableCell>
-                  <TableCell className="hidden text-right text-muted-foreground text-xs sm:table-cell">
-                    {new Date(f.modified).toLocaleString()}
-                  </TableCell>
-                </TableRow>
+                  onNavigate={navigateDir}
+                  onOpen={openFile}
+                />
               ))}
-              {files?.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    className="py-8 text-center text-muted-foreground"
-                    colSpan={3}
-                  >
-                    Empty directory
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
           </Table>
         )}

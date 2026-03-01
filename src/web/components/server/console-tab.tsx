@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from "@web/components/ui/card";
 import { api } from "@web/lib/api";
-import { Wifi, WifiOff } from "lucide-react";
+import { WifiOff } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Handle a single keypress/paste from the terminal and relay commands to the WebSocket. */
@@ -123,6 +123,7 @@ export function ConsoleTab({ serverId }: { serverId: string }) {
           background: "#09090b",
           foreground: "#d4d4d8",
           cursor: "#d4d4d8",
+          selectionBackground: "#27272a",
         },
         convertEol: true,
         scrollback: 5000,
@@ -178,25 +179,36 @@ export function ConsoleTab({ serverId }: { serverId: string }) {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base">Console</CardTitle>
-          <Badge variant={connected ? "default" : "secondary"}>
-            {connected ? (
-              <>
-                <Wifi className="mr-1 h-3 w-3" /> Connected
-              </>
-            ) : (
-              <>
-                <WifiOff className="mr-1 h-3 w-3" /> Disconnected
-              </>
-            )}
-          </Badge>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <CardTitle className="text-base">Console</CardTitle>
+            <Badge
+              aria-live="polite"
+              variant={connected ? "default" : "secondary"}
+            >
+              {connected ? (
+                <>
+                  <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                  Connected
+                </>
+              ) : (
+                <>
+                  <WifiOff className="mr-1 h-3 w-3" />
+                  Disconnected
+                </>
+              )}
+            </Badge>
+          </div>
+          <p className="hidden text-muted-foreground text-xs sm:block">
+            Type commands directly in the terminal
+          </p>
         </div>
       </CardHeader>
       <CardContent>
-        <div
-          className="h-80 overflow-hidden rounded-md border bg-zinc-950"
+        <section
+          aria-label="Server console terminal"
+          className="h-[28rem] overflow-hidden rounded-lg border border-border/50 bg-zinc-950"
           ref={termRef}
         />
       </CardContent>

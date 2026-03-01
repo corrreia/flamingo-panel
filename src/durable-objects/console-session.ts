@@ -16,7 +16,7 @@ export class ConsoleSession extends DurableObject {
   private panelUrl = "";
   private reconnectAttempts = 0;
   private static readonly MAX_RECONNECT_ATTEMPTS = 5;
-  private static readonly RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000];
+  private static readonly RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15_000];
 
   // On reconnect, Wings replays its console buffer. Clients already have those
   // lines, so we suppress broadcasting the first N messages (= our pre-reconnect
@@ -237,7 +237,7 @@ export class ConsoleSession extends DurableObject {
 
     const delay =
       ConsoleSession.RECONNECT_DELAYS[this.reconnectAttempts] ??
-      ConsoleSession.RECONNECT_DELAYS[ConsoleSession.RECONNECT_DELAYS.length - 1];
+      ConsoleSession.RECONNECT_DELAYS.at(-1);
     this.reconnectAttempts++;
     logger.info("wings reconnecting", {
       attempt: this.reconnectAttempts,
