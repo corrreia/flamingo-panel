@@ -8,10 +8,7 @@ import { python } from "@codemirror/lang-python";
 import { sql } from "@codemirror/lang-sql";
 import { xml } from "@codemirror/lang-xml";
 import { yaml } from "@codemirror/lang-yaml";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
-import { tags } from "@lezer/highlight";
+import { keymap } from "@codemirror/view";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { Badge } from "@web/components/ui/badge";
@@ -32,6 +29,7 @@ import {
   TableRow,
 } from "@web/components/ui/table";
 import { api } from "@web/lib/api";
+import { flamingoDark } from "@web/lib/codemirror-theme";
 import { formatBytes } from "@web/lib/format";
 import { ArrowLeft, ChevronRight, File, Folder, Save, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
@@ -109,48 +107,6 @@ function getLanguageExtension(filePath: string): Extension[] {
   }
 }
 
-const flamingoEditorTheme = EditorView.theme(
-  {
-    "&": {
-      backgroundColor: "#09090b",
-      color: "#d4d4d8",
-    },
-    ".cm-content": {
-      caretColor: "#d4d4d8",
-    },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-      backgroundColor: "#27272a !important",
-    },
-    ".cm-activeLine": {
-      backgroundColor: "#18181b",
-    },
-    ".cm-gutters": {
-      backgroundColor: "#09090b",
-      color: "#52525b",
-      border: "none",
-    },
-    ".cm-activeLineGutter": {
-      backgroundColor: "#18181b",
-    },
-  },
-  { dark: true }
-);
-
-const flamingoHighlightStyle = HighlightStyle.define([
-  { tag: tags.comment, color: "#6b7280" },
-  { tag: tags.string, color: "#a5d6ff" },
-  { tag: tags.number, color: "#79c0ff" },
-  { tag: tags.keyword, color: "#ff7b72" },
-  { tag: tags.definition(tags.variableName), color: "#ffa657" },
-  { tag: tags.typeName, color: "#7ee787" },
-  { tag: tags.propertyName, color: "#d2a8ff" },
-  { tag: tags.bool, color: "#79c0ff" },
-]);
-
-const flamingoDark: Extension = [
-  flamingoEditorTheme,
-  syntaxHighlighting(flamingoHighlightStyle),
-];
 
 export function FilesTab({ serverId }: { serverId: string }) {
   const [currentDir, setCurrentDir] = useState("/");
