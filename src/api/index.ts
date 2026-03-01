@@ -89,6 +89,7 @@ apiRoutes.get("/servers/:id/console", async (c) => {
   const data = JSON.parse(ticketData) as {
     serverId: string;
     serverUuid: string;
+    nodeId: number;
     userId: string;
     clientIp: string;
     wingsUrl: string;
@@ -108,6 +109,7 @@ apiRoutes.get("/servers/:id/console", async (c) => {
   connectUrl.searchParams.set("wingsToken", data.wingsToken);
   connectUrl.searchParams.set("userId", data.userId);
   connectUrl.searchParams.set("serverId", data.serverId);
+  connectUrl.searchParams.set("nodeId", String(data.nodeId));
   connectUrl.searchParams.set("clientIp", data.clientIp);
   connectUrl.searchParams.set("panelUrl", c.env.PANEL_URL);
 

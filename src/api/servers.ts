@@ -434,6 +434,7 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
     JSON.stringify({
       serverId: server.id,
       serverUuid: server.uuid,
+      nodeId: server.nodeId,
       userId: user.id,
       clientIp:
         c.req.header("cf-connecting-ip") ||

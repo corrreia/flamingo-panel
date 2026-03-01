@@ -15,6 +15,7 @@ export class ConsoleSession extends DurableObject<Env> {
   private wingsUrl = "";
   private wingsToken = "";
   private panelUrl = "";
+  private nodeId: number | null = null;
   private reconnectAttempts = 0;
   private static readonly MAX_RECONNECT_ATTEMPTS = 5;
   private static readonly RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15_000];
@@ -53,8 +54,11 @@ export class ConsoleSession extends DurableObject<Env> {
       const wingsToken = url.searchParams.get("wingsToken") ?? "";
       const userId = url.searchParams.get("userId") ?? "";
       const serverId = url.searchParams.get("serverId") ?? "";
+      const nodeId = url.searchParams.get("nodeId") ?? "";
       const clientIp = url.searchParams.get("clientIp") ?? "";
       const panelUrl = url.searchParams.get("panelUrl") ?? "";
+
+      this.nodeId = nodeId ? Number(nodeId) : null;
 
       // Accept the WebSocket from the client side of the pair
       const pair = new WebSocketPair();
@@ -294,6 +298,7 @@ export class ConsoleSession extends DurableObject<Env> {
             .values({
               userId,
               serverId,
+              nodeId: this.nodeId,
               event: "server:console.command",
               metadata: JSON.stringify({ command }),
               ip: clientIp,
