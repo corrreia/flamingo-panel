@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
+import { setupLogger } from "../lib/logger";
 import { generateApiKey } from "../services/api-keys";
 import { activityRoutes } from "./activity";
 import { applicationRoutes } from "./application";
@@ -8,12 +9,24 @@ import { authRoutes } from "./auth";
 import { eggRoutes } from "./eggs";
 import { fileRoutes } from "./files";
 import { requireAdmin, requireAuth } from "./middleware/auth";
+import { errorHandler, requestLogger } from "./middleware/request-logger";
 import { nodeRoutes } from "./nodes";
 import { remoteRoutes } from "./remote";
 import { serverRoutes } from "./servers";
 import { subuserRoutes } from "./subusers";
 
-export const apiRoutes = new Hono<{ Bindings: Env }>();
+export const apiRoutes = new Hono<{
+  Bindings: Env;
+  Variables: { requestId: string };
+}>();
+
+// Middleware (order matters: setupLogger first, then error handler, then request logger)
+apiRoutes.use("*", async (_c, next) => {
+  await setupLogger();
+  await next();
+});
+apiRoutes.use("*", errorHandler);
+apiRoutes.use("*", requestLogger);
 
 apiRoutes.get("/health", (c) => c.json({ status: "ok", version: "0.1.0" }));
 
