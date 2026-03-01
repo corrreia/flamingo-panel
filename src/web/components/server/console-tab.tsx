@@ -1,110 +1,180 @@
 import { Badge } from "@web/components/ui/badge";
-import { Button } from "@web/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@web/components/ui/card";
-import { Input } from "@web/components/ui/input";
 import { api } from "@web/lib/api";
 import { Wifi, WifiOff } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-interface ConsoleLine {
-  id: number;
-  text: string;
-}
-
-let nextLineId = 0;
-
-function addLine(text: string): ConsoleLine {
-  return { id: nextLineId++, text };
-}
-
-function handleWsMessage(
-  msg: { event: string; args?: string[] },
+/** Handle a single keypress/paste from the terminal and relay commands to the WebSocket. */
+function handleTerminalInput(
+  data: string,
+  terminal: import("@xterm/xterm").Terminal,
   ws: WebSocket,
-  setLines: React.Dispatch<React.SetStateAction<ConsoleLine[]>>
+  getBuffer: () => string,
+  setBuffer: (v: string) => void
 ) {
-  switch (msg.event) {
-    case "auth success":
-      ws.send(JSON.stringify({ event: "send logs" }));
-      break;
-    case "console output":
-      setLines((prev) => [
-        ...prev.slice(-500),
-        ...(msg.args as string[]).map((text) => addLine(text)),
-      ]);
-      break;
-    case "status":
-      setLines((prev) => [...prev, addLine(`[Status] ${msg.args?.[0]}`)]);
-      break;
-    case "daemon error":
-      setLines((prev) => [
-        ...prev,
-        addLine(`[Error] ${msg.args?.[0] || "Connection lost"}`),
-      ]);
-      break;
-    case "daemon message":
-      setLines((prev) => [...prev, addLine(`[Daemon] ${msg.args?.[0] || ""}`)]);
-      break;
-    default:
-      break;
+  if (data === "\r") {
+    terminal.write("\r\n");
+    const buf = getBuffer();
+    if (buf.trim()) {
+      ws.send(JSON.stringify({ event: "send command", args: [buf] }));
+    }
+    setBuffer("");
+  } else if (data === "\x7f") {
+    if (getBuffer().length > 0) {
+      setBuffer(getBuffer().slice(0, -1));
+      terminal.write("\b \b");
+    }
+  } else if (data >= " ") {
+    setBuffer(getBuffer() + data);
+    terminal.write(data);
   }
 }
 
 export function ConsoleTab({ serverId }: { serverId: string }) {
-  const [lines, setLines] = useState<ConsoleLine[]>([]);
-  const [command, setCommand] = useState("");
   const [connected, setConnected] = useState(false);
+  const termRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .get<{ ticket: string }>(`/servers/${serverId}/console-ticket`)
-      .then(({ ticket }) => {
-        if (cancelled) {
-          return;
+  // Stable callback for writing to terminal — set once terminal is created
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: noop initial value
+  const writeRef = useRef<(data: string) => void>(() => {});
+
+  const connect = useCallback(async () => {
+    const { ticket } = await api.get<{ ticket: string }>(
+      `/servers/${serverId}/console-ticket`
+    );
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(
+      `${protocol}//${window.location.host}/api/servers/${serverId}/console?ticket=${ticket}`
+    );
+    wsRef.current = ws;
+    ws.onopen = () => setConnected(true);
+    ws.onclose = () => setConnected(false);
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        switch (msg.event) {
+          case "auth success":
+            ws.send(JSON.stringify({ event: "send logs" }));
+            break;
+          case "console output":
+            for (const line of msg.args as string[]) {
+              writeRef.current(`${line}\r\n`);
+            }
+            break;
+          case "status":
+            writeRef.current(`\x1b[33m[Status] ${msg.args?.[0]}\x1b[0m\r\n`);
+            break;
+          case "daemon error":
+            writeRef.current(
+              `\x1b[31m[Error] ${msg.args?.[0] || "Connection lost"}\x1b[0m\r\n`
+            );
+            break;
+          case "daemon message":
+            writeRef.current(
+              `\x1b[36m[Daemon] ${msg.args?.[0] || ""}\x1b[0m\r\n`
+            );
+            break;
+          default:
+            break;
         }
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(
-          `${protocol}//${window.location.host}/api/servers/${serverId}/console?ticket=${ticket}`
-        );
-        wsRef.current = ws;
-        ws.onopen = () => setConnected(true);
-        ws.onmessage = (e) => {
-          try {
-            handleWsMessage(JSON.parse(e.data), ws, setLines);
-          } catch {
-            // WebSocket parse error, ignore
-          }
-        };
-        ws.onclose = () => setConnected(false);
-      });
-    return () => {
-      cancelled = true;
-      wsRef.current?.close();
+      } catch {
+        // parse error
+      }
     };
+    return ws;
   }, [serverId]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to bottom when new lines arrive
   useEffect(() => {
-    scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
-  }, [lines.length]);
-
-  const sendCommand = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!(command.trim() && wsRef.current)) {
+    const container = termRef.current;
+    if (!container) {
       return;
     }
-    wsRef.current.send(
-      JSON.stringify({ event: "send command", args: [command] })
-    );
-    setCommand("");
-  };
+
+    let disposed = false;
+    let terminal: import("@xterm/xterm").Terminal;
+    let fitAddon: import("@xterm/addon-fit").FitAddon;
+    let resizeObserver: ResizeObserver;
+
+    async function init() {
+      const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all(
+        [
+          import("@xterm/xterm"),
+          import("@xterm/addon-fit"),
+          import("@xterm/addon-web-links"),
+          import("@xterm/xterm/css/xterm.css"),
+        ]
+      );
+
+      if (disposed) {
+        return;
+      }
+
+      terminal = new Terminal({
+        cursorBlink: true,
+        fontSize: 13,
+        fontFamily: "ui-monospace, monospace",
+        theme: {
+          background: "#09090b",
+          foreground: "#d4d4d8",
+          cursor: "#d4d4d8",
+        },
+        convertEol: true,
+        scrollback: 5000,
+        disableStdin: false,
+      });
+
+      fitAddon = new FitAddon();
+      terminal.loadAddon(fitAddon);
+      terminal.loadAddon(new WebLinksAddon());
+
+      terminal.open(container);
+      fitAddon.fit();
+
+      writeRef.current = (data: string) => terminal.write(data);
+
+      // Line buffer for command input
+      let lineBuffer = "";
+      terminal.onData((data) => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          return;
+        }
+        handleTerminalInput(
+          data,
+          terminal,
+          ws,
+          () => lineBuffer,
+          (v) => {
+            lineBuffer = v;
+          }
+        );
+      });
+
+      // Resize on container size change
+      resizeObserver = new ResizeObserver(() => {
+        fitAddon.fit();
+      });
+      resizeObserver.observe(container);
+
+      // Connect WebSocket
+      connect();
+    }
+
+    init();
+
+    return () => {
+      disposed = true;
+      wsRef.current?.close();
+      resizeObserver?.disconnect();
+      terminal?.dispose();
+    };
+  }, [connect]);
 
   return (
     <Card>
@@ -126,30 +196,9 @@ export function ConsoleTab({ serverId }: { serverId: string }) {
       </CardHeader>
       <CardContent>
         <div
-          className="h-80 overflow-y-auto rounded-md border bg-zinc-950 p-3 font-mono text-xs"
-          ref={scrollRef}
-        >
-          {lines.map((line) => (
-            <div className="whitespace-pre-wrap text-zinc-300" key={line.id}>
-              {line.text}
-            </div>
-          ))}
-          {lines.length === 0 && (
-            <div className="text-zinc-600">Waiting for output...</div>
-          )}
-        </div>
-        <form className="mt-2 flex gap-2" onSubmit={sendCommand}>
-          <Input
-            className="font-mono text-sm"
-            disabled={!connected}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder="Type a command..."
-            value={command}
-          />
-          <Button disabled={!connected} type="submit">
-            Send
-          </Button>
-        </form>
+          className="h-80 overflow-hidden rounded-md border bg-zinc-950"
+          ref={termRef}
+        />
       </CardContent>
     </Card>
   );
