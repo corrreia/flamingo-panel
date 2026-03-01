@@ -19,6 +19,20 @@ import {
 import { api } from "@web/lib/api";
 import { useState } from "react";
 
+function formatMetadata(raw: string | null): string {
+  if (!raw || raw === "{}") {
+    return "";
+  }
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    return Object.entries(obj)
+      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`)
+      .join(" \u00b7 ");
+  } catch {
+    return "";
+  }
+}
+
 interface ActivityEntry {
   createdAt: string;
   event: string;
@@ -75,6 +89,11 @@ export function ActivityTab({ serverId }: { serverId: string }) {
                       <Badge className="font-mono text-xs" variant="secondary">
                         {entry.event}
                       </Badge>
+                      {formatMetadata(entry.metadata) && (
+                        <p className="mt-1 max-w-xs truncate font-mono text-muted-foreground text-xs">
+                          {formatMetadata(entry.metadata)}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {entry.userName || entry.userId || "System"}
