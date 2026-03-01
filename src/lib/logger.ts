@@ -1,4 +1,9 @@
-import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
+import {
+  configure,
+  getConsoleSink,
+  getLogger,
+  jsonLinesFormatter,
+} from "@logtape/logtape";
 
 let configured = false;
 
@@ -15,7 +20,7 @@ export async function setupLogger() {
   await configure({
     sinks: {
       console: getConsoleSink({
-        formatter: "json",
+        formatter: jsonLinesFormatter,
       }),
     },
     loggers: [
