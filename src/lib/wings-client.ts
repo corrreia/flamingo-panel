@@ -2,6 +2,10 @@
 // Each Wings node runs cloudflared, so we reach it via its tunnel hostname.
 // The node URL can be https://wings.example.com, http://10.0.0.5:8080, etc.
 
+import { createLogger } from "./logger";
+
+const logger = createLogger("wings");
+
 const TRAILING_SLASH_RE = /\/+$/;
 
 interface WingsNode {
@@ -25,7 +29,10 @@ export class WingsClient {
     path: string,
     body?: unknown
   ): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const url = `${this.baseUrl}${path}`;
+    logger.info("wings request", { method, url });
+
+    const res = await fetch(url, {
       method,
       headers: {
         Authorization: this.authHeader,
@@ -37,6 +44,12 @@ export class WingsClient {
 
     if (!res.ok) {
       const error = await res.text();
+      logger.error("wings request failed", {
+        method,
+        url,
+        status: res.status,
+        error,
+      });
       throw new WingsError(res.status, error);
     }
 
@@ -116,6 +129,11 @@ export class WingsClient {
       }
     );
     if (!res.ok) {
+      logger.error("wings file read failed", {
+        uuid,
+        file,
+        status: res.status,
+      });
       throw new WingsError(res.status, await res.text());
     }
     return res;
@@ -138,6 +156,11 @@ export class WingsClient {
       }
     );
     if (!res.ok) {
+      logger.error("wings file write failed", {
+        uuid,
+        file,
+        status: res.status,
+      });
       throw new WingsError(res.status, await res.text());
     }
   }
