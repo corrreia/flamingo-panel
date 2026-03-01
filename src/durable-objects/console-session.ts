@@ -10,6 +10,19 @@ export class ConsoleSession extends DurableObject {
   private buffer: string[] = [];
   private static readonly BUFFER_SIZE = 200;
 
+  // Stored for reconnection
+  private wingsUrl = "";
+  private wingsToken = "";
+  private panelUrl = "";
+  private reconnectAttempts = 0;
+  private static readonly MAX_RECONNECT_ATTEMPTS = 5;
+  private static readonly RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000];
+
+  // On reconnect, Wings replays its console buffer. Clients already have those
+  // lines, so we suppress broadcasting the first N messages (= our pre-reconnect
+  // buffer size) and just let them silently refill the buffer.
+  private skipReplayCount = 0;
+
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env);
     // biome-ignore lint/suspicious/useAwait: blockConcurrencyWhile requires async callback
@@ -55,6 +68,11 @@ export class ConsoleSession extends DurableObject {
         server.send(line);
       }
 
+      // Store connection params for reconnection
+      this.wingsUrl = wingsUrl;
+      this.wingsToken = wingsToken;
+      this.panelUrl = panelUrl;
+
       // Connect to Wings if not already connected.
       // Use waitUntil so we return the 101 immediately — the browser gets
       // "Connected" right away and console output flows once Wings is ready.
@@ -66,6 +84,7 @@ export class ConsoleSession extends DurableObject {
             args: ["Connecting to server console..."],
           })
         );
+        this.reconnectAttempts = 0;
         this.ctx.waitUntil(this.connectToWings(wingsUrl, wingsToken, panelUrl));
       }
 
@@ -96,6 +115,11 @@ export class ConsoleSession extends DurableObject {
       }
       this.wingsSocket = null;
     }
+
+    // On reconnect, Wings will replay its console buffer. Suppress broadcasting
+    // those messages (clients already have them) and let them just refill ours.
+    this.skipReplayCount = this.buffer.length;
+    this.buffer = [];
 
     // Workers fetch() only supports http(s):// — convert wss:// back to https://
     // (the wingsUrl was built with wss:// for browser WebSocket, but DOs use fetch + Upgrade)
@@ -146,10 +170,16 @@ export class ConsoleSession extends DurableObject {
     ws.addEventListener("message", (event) => {
       const data = typeof event.data === "string" ? event.data : "";
 
-      // Buffer for reconnect replay
+      // Buffer for new-client replay
       this.buffer.push(data);
       if (this.buffer.length > ConsoleSession.BUFFER_SIZE) {
         this.buffer = this.buffer.slice(-ConsoleSession.BUFFER_SIZE);
+      }
+
+      // After reconnect, suppress Wings' replay — clients already have it
+      if (this.skipReplayCount > 0) {
+        this.skipReplayCount--;
+        return;
       }
 
       // Fan out to all connected browser clients
@@ -165,17 +195,18 @@ export class ConsoleSession extends DurableObject {
     });
 
     ws.addEventListener("close", () => {
-      logger.warn("wings connection lost");
       this.wingsSocket = null;
-      this.broadcastError("Wings connection lost");
+      this.scheduleReconnect();
     });
 
     ws.addEventListener("error", () => {
       logger.error("wings websocket error");
       this.wingsSocket = null;
+      this.scheduleReconnect();
     });
 
     this.wingsSocket = ws;
+    this.reconnectAttempts = 0;
   }
 
   private broadcastError(message: string) {
@@ -187,6 +218,49 @@ export class ConsoleSession extends DurableObject {
         /* client gone */
       }
     }
+  }
+
+  private scheduleReconnect() {
+    const clients = this.ctx.getWebSockets();
+    if (clients.length === 0 || !this.wingsUrl) {
+      logger.warn("wings connection lost, no clients to reconnect for");
+      return;
+    }
+
+    if (this.reconnectAttempts >= ConsoleSession.MAX_RECONNECT_ATTEMPTS) {
+      logger.error("wings reconnect failed after max attempts", {
+        attempts: this.reconnectAttempts,
+      });
+      this.broadcastError("Wings connection lost");
+      return;
+    }
+
+    const delay =
+      ConsoleSession.RECONNECT_DELAYS[this.reconnectAttempts] ??
+      ConsoleSession.RECONNECT_DELAYS[ConsoleSession.RECONNECT_DELAYS.length - 1];
+    this.reconnectAttempts++;
+    logger.info("wings reconnecting", {
+      attempt: this.reconnectAttempts,
+      delayMs: delay,
+    });
+
+    this.ctx.waitUntil(
+      new Promise<void>((resolve) => {
+        setTimeout(async () => {
+          // Check again — clients may have left during the delay
+          if (this.ctx.getWebSockets().length === 0) {
+            resolve();
+            return;
+          }
+          await this.connectToWings(
+            this.wingsUrl,
+            this.wingsToken,
+            this.panelUrl
+          );
+          resolve();
+        }, delay);
+      })
+    );
   }
 
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {

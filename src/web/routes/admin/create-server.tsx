@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@web/components/ui/select";
 import { Skeleton } from "@web/components/ui/skeleton";
-import { Switch } from "@web/components/ui/switch";
+
 import { api } from "@web/lib/api";
 import { ChevronRight, Server } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -85,12 +85,12 @@ function CreateServerPage() {
   const [ownerId, setOwnerId] = useState("");
   const [nodeId, setNodeId] = useState("");
   const [eggId, setEggId] = useState("");
-  const [memory, setMemory] = useState("512");
+  const [memory, setMemory] = useState("1024");
+  const [customMemory, setCustomMemory] = useState("");
   const [cpu, setCpu] = useState("100");
+  const [customCpu, setCustomCpu] = useState("");
   const [disk, setDisk] = useState("1024");
-  const [unlimitedMemory, setUnlimitedMemory] = useState(false);
-  const [unlimitedCpu, setUnlimitedCpu] = useState(false);
-  const [unlimitedDisk, setUnlimitedDisk] = useState(false);
+  const [customDisk, setCustomDisk] = useState("");
   const [port, setPort] = useState("25565");
   const [selectedImage, setSelectedImage] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -156,6 +156,11 @@ function CreateServerPage() {
     }
   })();
 
+  const resolvedMemory =
+    memory === "custom" ? Number(customMemory) : Number(memory);
+  const resolvedCpu = cpu === "custom" ? Number(customCpu) : Number(cpu);
+  const resolvedDisk = disk === "custom" ? Number(customDisk) : Number(disk);
+
   const createMutation = useMutation({
     mutationFn: () =>
       api.post("/servers", {
@@ -164,9 +169,9 @@ function CreateServerPage() {
         ownerId,
         nodeId: Number.parseInt(nodeId, 10),
         eggId,
-        memory: unlimitedMemory ? 0 : Number.parseInt(memory, 10),
-        cpu: unlimitedCpu ? 0 : Number.parseInt(cpu, 10),
-        disk: unlimitedDisk ? 0 : Number.parseInt(disk, 10),
+        memory: resolvedMemory,
+        cpu: resolvedCpu,
+        disk: resolvedDisk,
         defaultAllocationPort: Number.parseInt(port, 10),
         image: selectedImage || undefined,
         variables,
@@ -372,70 +377,93 @@ function CreateServerPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="srv-memory">Memory (MB)</Label>
-                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                      Unlimited
-                      <Switch
-                        checked={unlimitedMemory}
-                        onCheckedChange={setUnlimitedMemory}
-                        size="sm"
-                      />
-                    </div>
-                  </div>
-                  <Input
-                    disabled={unlimitedMemory}
-                    id="srv-memory"
-                    min="64"
-                    onChange={(e) => setMemory(e.target.value)}
-                    placeholder={unlimitedMemory ? "Unlimited" : undefined}
-                    type="number"
-                    value={unlimitedMemory ? "" : memory}
-                  />
+                  <Label>Memory</Label>
+                  <Select onValueChange={setMemory} value={memory}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="512">512 MB</SelectItem>
+                      <SelectItem value="1024">1 GB</SelectItem>
+                      <SelectItem value="2048">2 GB</SelectItem>
+                      <SelectItem value="3072">3 GB</SelectItem>
+                      <SelectItem value="4096">4 GB</SelectItem>
+                      <SelectItem value="8192">8 GB</SelectItem>
+                      <SelectItem value="16384">16 GB</SelectItem>
+                      <SelectItem value="custom">Custom...</SelectItem>
+                      <SelectItem value="0">Unlimited</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {memory === "custom" && (
+                    <Input
+                      min="64"
+                      onChange={(e) => setCustomMemory(e.target.value)}
+                      placeholder="Memory in MB"
+                      type="number"
+                      value={customMemory}
+                    />
+                  )}
+                  {memory === "0" && (
+                    <Alert>
+                      <AlertDescription>
+                        Unlimited memory sets SERVER_MEMORY to 0. Eggs using{" "}
+                        {"{{SERVER_MEMORY}}"} for JVM flags (e.g. -Xmx) will
+                        fail to start.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="srv-cpu">CPU Limit (%)</Label>
-                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                      Unlimited
-                      <Switch
-                        checked={unlimitedCpu}
-                        onCheckedChange={setUnlimitedCpu}
-                        size="sm"
-                      />
-                    </div>
-                  </div>
-                  <Input
-                    disabled={unlimitedCpu}
-                    id="srv-cpu"
-                    min="10"
-                    onChange={(e) => setCpu(e.target.value)}
-                    placeholder={unlimitedCpu ? "Unlimited" : undefined}
-                    type="number"
-                    value={unlimitedCpu ? "" : cpu}
-                  />
+                  <Label>CPU Limit</Label>
+                  <Select onValueChange={setCpu} value={cpu}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="100">100%</SelectItem>
+                      <SelectItem value="200">200%</SelectItem>
+                      <SelectItem value="300">300%</SelectItem>
+                      <SelectItem value="400">400%</SelectItem>
+                      <SelectItem value="custom">Custom...</SelectItem>
+                      <SelectItem value="0">Unlimited</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {cpu === "custom" && (
+                    <Input
+                      min="10"
+                      onChange={(e) => setCustomCpu(e.target.value)}
+                      placeholder="CPU limit in %"
+                      type="number"
+                      value={customCpu}
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="srv-disk">Disk (MB)</Label>
-                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                      Unlimited
-                      <Switch
-                        checked={unlimitedDisk}
-                        onCheckedChange={setUnlimitedDisk}
-                        size="sm"
-                      />
-                    </div>
-                  </div>
-                  <Input
-                    disabled={unlimitedDisk}
-                    id="srv-disk"
-                    min="128"
-                    onChange={(e) => setDisk(e.target.value)}
-                    placeholder={unlimitedDisk ? "Unlimited" : undefined}
-                    type="number"
-                    value={unlimitedDisk ? "" : disk}
-                  />
+                  <Label>Disk</Label>
+                  <Select onValueChange={setDisk} value={disk}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1024">1 GB</SelectItem>
+                      <SelectItem value="2048">2 GB</SelectItem>
+                      <SelectItem value="5120">5 GB</SelectItem>
+                      <SelectItem value="10240">10 GB</SelectItem>
+                      <SelectItem value="25600">25 GB</SelectItem>
+                      <SelectItem value="51200">50 GB</SelectItem>
+                      <SelectItem value="custom">Custom...</SelectItem>
+                      <SelectItem value="0">Unlimited</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {disk === "custom" && (
+                    <Input
+                      min="128"
+                      onChange={(e) => setCustomDisk(e.target.value)}
+                      placeholder="Disk in MB"
+                      type="number"
+                      value={customDisk}
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="srv-port">Primary Port</Label>
@@ -550,19 +578,21 @@ function CreateServerPage() {
                 <div>
                   <span className="text-muted-foreground">Memory:</span>
                   <span className="ml-2 font-medium">
-                    {unlimitedMemory ? "Unlimited" : `${memory} MB`}
+                    {resolvedMemory === 0
+                      ? "Unlimited"
+                      : `${resolvedMemory} MB`}
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">CPU:</span>
                   <span className="ml-2 font-medium">
-                    {unlimitedCpu ? "Unlimited" : `${cpu}%`}
+                    {resolvedCpu === 0 ? "Unlimited" : `${resolvedCpu}%`}
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Disk:</span>
                   <span className="ml-2 font-medium">
-                    {unlimitedDisk ? "Unlimited" : `${disk} MB`}
+                    {resolvedDisk === 0 ? "Unlimited" : `${resolvedDisk} MB`}
                   </span>
                 </div>
                 <div>
