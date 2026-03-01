@@ -17,7 +17,10 @@ function send(entry: ClientLogEntry) {
   try {
     const body = JSON.stringify(entry);
     if (navigator.sendBeacon) {
-      navigator.sendBeacon(LOG_ENDPOINT, body);
+      navigator.sendBeacon(
+        LOG_ENDPOINT,
+        new Blob([body], { type: "application/json" }),
+      );
     } else {
       fetch(LOG_ENDPOINT, {
         method: "POST",
@@ -31,10 +34,15 @@ function send(entry: ClientLogEntry) {
   }
 }
 
+let initialized = false;
+
 /**
  * Call once in the app root to capture unhandled errors and rejections.
  */
 export function initClientErrorCapture() {
+  if (initialized) return;
+  initialized = true;
+
   window.addEventListener("error", (event) => {
     send({
       level: "error",
