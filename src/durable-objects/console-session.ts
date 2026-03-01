@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { getDb, schema } from "../db";
 import { createLogger, setupLogger } from "../lib/logger";
 
 const logger = createLogger("durable-objects", "console");
@@ -286,19 +287,19 @@ export class ConsoleSession extends DurableObject<Env> {
         );
 
         // Also log to D1 so it appears in the activity page
+        const db = getDb(this.env.DB);
         this.ctx.waitUntil(
-          this.env.DB.prepare(
-            "INSERT INTO activity_logs (user_id, server_id, event, metadata, ip) VALUES (?, ?, ?, ?, ?)"
-          )
-            .bind(
+          db
+            .insert(schema.activityLogs)
+            .values({
               userId,
               serverId,
-              "server:console.command",
-              JSON.stringify({ command }),
-              clientIp
-            )
-            .run()
-            .catch(() => {})
+              event: "server:console.command",
+              metadata: JSON.stringify({ command }),
+              ip: clientIp,
+            })
+            .then(() => undefined)
+            .catch(() => undefined)
         );
       }
     } catch {
