@@ -435,6 +435,11 @@ serverRoutes.get("/:id/console-ticket", async (c) => {
       serverId: server.id,
       serverUuid: server.uuid,
       userId: user.id,
+      clientIp:
+        c.req.header("cf-connecting-ip") ||
+        c.req.header("x-real-ip") ||
+        c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+        "",
       wingsUrl: `${node.url.replace(HTTP_PROTOCOL_RE, "ws").replace(TRAILING_SLASHES_RE, "")}/api/servers/${server.uuid}/ws`,
       wingsToken,
     }),

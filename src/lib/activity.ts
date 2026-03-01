@@ -13,7 +13,10 @@ export function logActivity(
 ) {
   const user = c.get("user" as never) as { id: string } | undefined;
   const ip =
-    c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "";
+    c.req.header("cf-connecting-ip") ||
+    c.req.header("x-real-ip") ||
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "";
   const db = getDb(c.env.DB);
 
   const promise = db

@@ -90,6 +90,7 @@ apiRoutes.get("/servers/:id/console", async (c) => {
     serverId: string;
     serverUuid: string;
     userId: string;
+    clientIp: string;
     wingsUrl: string;
     wingsToken: string;
   };
@@ -107,6 +108,7 @@ apiRoutes.get("/servers/:id/console", async (c) => {
   connectUrl.searchParams.set("wingsToken", data.wingsToken);
   connectUrl.searchParams.set("userId", data.userId);
   connectUrl.searchParams.set("serverId", data.serverId);
+  connectUrl.searchParams.set("clientIp", data.clientIp);
   connectUrl.searchParams.set("panelUrl", c.env.PANEL_URL);
 
   return stub.fetch(new Request(connectUrl.toString(), c.req.raw));

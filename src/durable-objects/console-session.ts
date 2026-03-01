@@ -5,7 +5,7 @@ const logger = createLogger("durable-objects", "console");
 const WSS_RE = /^wss:/;
 const WS_RE = /^ws:/;
 
-export class ConsoleSession extends DurableObject {
+export class ConsoleSession extends DurableObject<Env> {
   private wingsSocket: WebSocket | null = null;
   private buffer: string[] = [];
   private static readonly BUFFER_SIZE = 200;
@@ -23,7 +23,7 @@ export class ConsoleSession extends DurableObject {
   // buffer size) and just let them silently refill the buffer.
   private skipReplayCount = 0;
 
-  constructor(ctx: DurableObjectState, env: unknown) {
+  constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     // biome-ignore lint/suspicious/useAwait: blockConcurrencyWhile requires async callback
     ctx.blockConcurrencyWhile(async () => {
@@ -52,14 +52,15 @@ export class ConsoleSession extends DurableObject {
       const wingsToken = url.searchParams.get("wingsToken") ?? "";
       const userId = url.searchParams.get("userId") ?? "";
       const serverId = url.searchParams.get("serverId") ?? "";
+      const clientIp = url.searchParams.get("clientIp") ?? "";
       const panelUrl = url.searchParams.get("panelUrl") ?? "";
 
       // Accept the WebSocket from the client side of the pair
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
-      // Tag with user info for identification
-      this.ctx.acceptWebSocket(server, [userId, serverId]);
+      // Tag with user info for identification (userId, serverId, clientIp)
+      this.ctx.acceptWebSocket(server, [userId, serverId, clientIp]);
 
       logger.info("client connected", { userId, serverId });
 
@@ -267,17 +268,37 @@ export class ConsoleSession extends DurableObject {
     const data =
       typeof message === "string" ? message : new TextDecoder().decode(message);
 
-    // Log commands to audit trail
+    // Log commands to D1 activity log + local audit trail
     try {
       const parsed = JSON.parse(data);
       if (parsed.event === "send command" && parsed.args?.[0]) {
         const tags = this.ctx.getTags(ws);
         const userId = tags[0] || "unknown";
+        const serverId = tags[1] || null;
+        const clientIp = tags[2] || "";
+        const command = parsed.args[0];
+
         this.ctx.storage.sql.exec(
           "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
           userId,
           "console.command",
-          parsed.args[0]
+          command
+        );
+
+        // Also log to D1 so it appears in the activity page
+        this.ctx.waitUntil(
+          this.env.DB.prepare(
+            "INSERT INTO activity_logs (user_id, server_id, event, metadata, ip) VALUES (?, ?, ?, ?, ?)"
+          )
+            .bind(
+              userId,
+              serverId,
+              "server:console.command",
+              JSON.stringify({ command }),
+              clientIp
+            )
+            .run()
+            .catch(() => {})
         );
       }
     } catch {
