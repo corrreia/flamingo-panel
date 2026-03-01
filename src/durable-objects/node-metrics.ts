@@ -1,5 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
+import { createLogger, setupLogger } from "../lib/logger";
 import type { SystemUtilization } from "../lib/wings-client";
+
+const logger = createLogger("durable-objects", "metrics");
 
 const POLL_INTERVAL_MS = 5000;
 const TRAILING_SLASH_RE = /\/+$/;
@@ -10,6 +13,7 @@ export class NodeMetrics extends DurableObject {
   private utilization: SystemUtilization | null = null;
 
   async fetch(request: Request): Promise<Response> {
+    await setupLogger();
     const url = new URL(request.url);
 
     if (url.pathname === "/connect") {
@@ -30,6 +34,8 @@ export class NodeMetrics extends DurableObject {
       const [client, server] = Object.values(pair);
 
       this.ctx.acceptWebSocket(server);
+
+      logger.info("metrics client connected");
 
       // Send cached data immediately
       if (this.utilization) {
@@ -72,6 +78,7 @@ export class NodeMetrics extends DurableObject {
   }
 
   webSocketClose() {
+    logger.info("metrics client disconnected");
     this.stopIfEmpty();
   }
 
@@ -114,6 +121,9 @@ export class NodeMetrics extends DurableObject {
         },
       });
     } catch (err) {
+      logger.error("utilization fetch failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.broadcast({
         event: "error",
         data: `Failed to fetch utilization: ${err instanceof Error ? err.message : "unknown"}`,

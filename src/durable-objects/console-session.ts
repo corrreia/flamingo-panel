@@ -1,4 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
+import { createLogger, setupLogger } from "../lib/logger";
+
+const logger = createLogger("durable-objects", "console");
+const WSS_RE = /^wss:/;
+const WS_RE = /^ws:/;
 
 export class ConsoleSession extends DurableObject {
   private wingsSocket: WebSocket | null = null;
@@ -21,7 +26,8 @@ export class ConsoleSession extends DurableObject {
     });
   }
 
-  fetch(request: Request): Response {
+  async fetch(request: Request): Promise<Response> {
+    await setupLogger();
     const url = new URL(request.url);
 
     if (url.pathname === "/connect") {
@@ -41,6 +47,8 @@ export class ConsoleSession extends DurableObject {
 
       // Tag with user info for identification
       this.ctx.acceptWebSocket(server, [userId, serverId]);
+
+      logger.info("client connected", { userId, serverId });
 
       // Send buffered lines to the new client immediately
       for (const line of this.buffer) {
@@ -91,7 +99,7 @@ export class ConsoleSession extends DurableObject {
 
     // Workers fetch() only supports http(s):// — convert wss:// back to https://
     // (the wingsUrl was built with wss:// for browser WebSocket, but DOs use fetch + Upgrade)
-    const fetchUrl = wingsUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
+    const fetchUrl = wingsUrl.replace(WSS_RE, "https:").replace(WS_RE, "http:");
 
     // Use fetch() with Upgrade header so we can set Origin.
     // Wings checks Origin against its configured panel URL.
@@ -110,33 +118,23 @@ export class ConsoleSession extends DurableObject {
         err instanceof DOMException && err.name === "TimeoutError"
           ? "Connection to Wings timed out (10s)"
           : `Failed to connect to Wings: ${err instanceof Error ? err.message : String(err)}`;
-      const errorMsg = JSON.stringify({
-        event: "daemon error",
-        args: [reason],
+      logger.error("wings connection failed", {
+        wingsUrl: fetchUrl,
+        error: reason,
       });
-      for (const client of this.ctx.getWebSockets()) {
-        try {
-          client.send(errorMsg);
-        } catch {
-          /* client gone */
-        }
-      }
+      this.broadcastError(reason);
       return;
     }
 
     const ws = resp.webSocket;
     if (!ws) {
-      const errorMsg = JSON.stringify({
-        event: "daemon error",
-        args: [`Wings WebSocket upgrade failed (HTTP ${resp.status})`],
+      logger.error("wings websocket upgrade failed", {
+        wingsUrl: fetchUrl,
+        status: resp.status,
       });
-      for (const client of this.ctx.getWebSockets()) {
-        try {
-          client.send(errorMsg);
-        } catch {
-          /* client gone */
-        }
-      }
+      this.broadcastError(
+        `Wings WebSocket upgrade failed (HTTP ${resp.status})`
+      );
       return;
     }
 
@@ -167,25 +165,28 @@ export class ConsoleSession extends DurableObject {
     });
 
     ws.addEventListener("close", () => {
+      logger.warn("wings connection lost");
       this.wingsSocket = null;
-      const msg = JSON.stringify({
-        event: "daemon error",
-        args: ["Wings connection lost"],
-      });
-      for (const client of this.ctx.getWebSockets()) {
-        try {
-          client.send(msg);
-        } catch {
-          /* client gone */
-        }
-      }
+      this.broadcastError("Wings connection lost");
     });
 
     ws.addEventListener("error", () => {
+      logger.error("wings websocket error");
       this.wingsSocket = null;
     });
 
     this.wingsSocket = ws;
+  }
+
+  private broadcastError(message: string) {
+    const payload = JSON.stringify({ event: "daemon error", args: [message] });
+    for (const client of this.ctx.getWebSockets()) {
+      try {
+        client.send(payload);
+      } catch {
+        /* client gone */
+      }
+    }
   }
 
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
@@ -218,6 +219,7 @@ export class ConsoleSession extends DurableObject {
   webSocketClose(ws: WebSocket) {
     const tags = this.ctx.getTags(ws);
     const userId = tags[0] || "unknown";
+    logger.info("client disconnected", { userId });
     this.ctx.storage.sql.exec(
       "INSERT INTO audit_log (user_id, event, data) VALUES (?, ?, ?)",
       userId,

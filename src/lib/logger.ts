@@ -7,23 +7,25 @@ let configured = false;
  * Call this at Worker startup (in server.ts fetch handler).
  */
 export async function setupLogger() {
-	if (configured) return;
-	configured = true;
+  if (configured) {
+    return;
+  }
+  configured = true;
 
-	await configure({
-		sinks: {
-			console: getConsoleSink({
-				formatter: "json",
-			}),
-		},
-		loggers: [
-			{
-				category: ["flamingo"],
-				sinks: ["console"],
-				lowestLevel: "info",
-			},
-		],
-	});
+  await configure({
+    sinks: {
+      console: getConsoleSink({
+        formatter: "json",
+      }),
+    },
+    loggers: [
+      {
+        category: ["flamingo"],
+        sinks: ["console"],
+        lowestLevel: "info",
+      },
+    ],
+  });
 }
 
 /**
@@ -36,5 +38,5 @@ export async function setupLogger() {
  * Categories are hierarchical: ["flamingo", "api", "servers"]
  */
 export function createLogger(...categories: string[]) {
-	return getLogger(["flamingo", ...categories]);
+  return getLogger(["flamingo", ...categories]);
 }
