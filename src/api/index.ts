@@ -11,6 +11,7 @@ import { fileRoutes } from "./files";
 import { requireAdmin, requireAuth } from "./middleware/auth";
 import { errorHandler, requestLogger } from "./middleware/request-logger";
 import { nodeRoutes } from "./nodes";
+import { notificationRoutes } from "./notifications";
 import { remoteRoutes } from "./remote";
 import { serverRoutes } from "./servers";
 import { subuserRoutes } from "./subusers";
@@ -124,6 +125,7 @@ apiRoutes.route("/servers", serverRoutes);
 apiRoutes.route("/servers", fileRoutes); // mounts /:serverId/files/*
 apiRoutes.route("/servers", subuserRoutes); // mounts /:serverId/subusers/*
 apiRoutes.route("/eggs", eggRoutes);
+apiRoutes.route("/notifications", notificationRoutes);
 apiRoutes.route("/remote", remoteRoutes);
 apiRoutes.route("/application", applicationRoutes);
 

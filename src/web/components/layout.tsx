@@ -14,6 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@web/components/ui/sheet";
+import { NotificationBell } from "@web/components/notification-bell";
 import { useAuth } from "@web/lib/auth";
 import {
   ClipboardList,
@@ -100,6 +101,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             </Button>
           )}
+          <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className="relative h-8 w-8 rounded-full" variant="ghost">

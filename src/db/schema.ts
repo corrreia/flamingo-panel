@@ -194,6 +194,28 @@ export const activityLogs = sqliteTable(
   ]
 );
 
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    category: text("category").notNull().default("system"), // resource, node, server, system
+    level: text("level").notNull().default("info"), // info, warning, critical
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    metadata: text("metadata").default("{}"),
+    readAt: text("read_at"),
+    ...timestamps,
+  },
+  (table) => [
+    index("idx_notifications_user").on(table.userId),
+    index("idx_notifications_read").on(table.userId, table.readAt),
+    index("idx_notifications_created").on(table.createdAt),
+  ]
+);
+
 export const wingsActivityLogs = sqliteTable(
   "wings_activity_logs",
   {
