@@ -137,6 +137,7 @@ serverRoutes.post(
     }
 
     // Atomically check port availability and create server + variables
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: transaction bundles port check + server + variables atomically
     const server = await db.transaction(async (tx) => {
       // Check port is not already in use on this node
       const nodeServers = await tx
@@ -156,7 +157,9 @@ serverRoutes.post(
             s.additionalAllocations || "[]"
           ) as unknown[];
           for (const port of extra) {
-            if (typeof port === "number") usedPorts.add(port);
+            if (typeof port === "number") {
+              usedPorts.add(port);
+            }
           }
         } catch {
           // invalid JSON — skip

@@ -1,18 +1,18 @@
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
-import { getDb, schema } from "../db";
 import type { Database } from "../db";
+import { getDb, schema } from "../db";
 
 export type NotificationCategory = "resource" | "node" | "server" | "system";
 export type NotificationLevel = "info" | "warning" | "critical";
 
 interface CreateNotificationOpts {
-  userId: string;
   category: NotificationCategory;
   level: NotificationLevel;
-  title: string;
   message: string;
   metadata?: Record<string, unknown>;
+  title: string;
+  userId: string;
 }
 
 /**
@@ -71,8 +71,6 @@ export async function notifyAdmins(
     .all();
 
   await Promise.all(
-    admins.map((admin) =>
-      createNotification(db, { ...opts, userId: admin.id })
-    )
+    admins.map((admin) => createNotification(db, { ...opts, userId: admin.id }))
   );
 }

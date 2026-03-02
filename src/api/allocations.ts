@@ -4,7 +4,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { type Database, getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
-import { findOverlappingRanges } from "../lib/port-check";
 import { type AuthUser, requireAdmin, requireAuth } from "./middleware/auth";
 
 export const allocationRoutes = new Hono<{
@@ -195,18 +194,46 @@ allocationRoutes.post(
       return c.json({ error: "Node not found" }, 404);
     }
 
-    // Check for overlapping ranges on this node (from any user)
-    const overlaps = await findOverlappingRanges(
-      db,
-      data.nodeId,
-      data.startPort,
-      data.endPort
-    );
-    if (overlaps.length > 0) {
+    // Atomically check for overlapping ranges and insert
+    const txResult = await db.transaction(async (tx) => {
+      const allRanges = await tx
+        .select({
+          id: schema.portAllocations.id,
+          userId: schema.portAllocations.userId,
+          startPort: schema.portAllocations.startPort,
+          endPort: schema.portAllocations.endPort,
+        })
+        .from(schema.portAllocations)
+        .where(eq(schema.portAllocations.nodeId, data.nodeId))
+        .all();
+
+      const overlaps = allRanges.filter(
+        (r) => data.startPort <= r.endPort && r.startPort <= data.endPort
+      );
+
+      if (overlaps.length > 0) {
+        return { conflict: overlaps };
+      }
+
+      const portRange = await tx
+        .insert(schema.portAllocations)
+        .values({
+          userId,
+          nodeId: data.nodeId,
+          startPort: data.startPort,
+          endPort: data.endPort,
+        })
+        .returning()
+        .get();
+
+      return { portRange };
+    });
+
+    if ("conflict" in txResult) {
       return c.json(
         {
           error: "Port range overlaps with existing allocation",
-          conflicts: overlaps.map((o) => ({
+          conflicts: txResult.conflict.map((o) => ({
             userId: o.userId,
             range: `${o.startPort}-${o.endPort}`,
           })),
@@ -215,16 +242,7 @@ allocationRoutes.post(
       );
     }
 
-    const portRange = await db
-      .insert(schema.portAllocations)
-      .values({
-        userId,
-        nodeId: data.nodeId,
-        startPort: data.startPort,
-        endPort: data.endPort,
-      })
-      .returning()
-      .get();
+    const { portRange } = txResult;
 
     logActivity(c, {
       event: "user:ports:create",
@@ -254,42 +272,38 @@ allocationRoutes.get("/:userId/ports", requireAdmin, async (c) => {
 });
 
 // Delete a specific port range (admin only)
-allocationRoutes.delete(
-  "/:userId/ports/:portId",
-  requireAdmin,
-  async (c) => {
-    const db = getDb(c.env.DB);
-    const userId = c.req.param("userId");
-    const portId = c.req.param("portId");
+allocationRoutes.delete("/:userId/ports/:portId", requireAdmin, async (c) => {
+  const db = getDb(c.env.DB);
+  const userId = c.req.param("userId");
+  const portId = c.req.param("portId");
 
-    const existing = await db
-      .select()
-      .from(schema.portAllocations)
-      .where(
-        and(
-          eq(schema.portAllocations.id, portId),
-          eq(schema.portAllocations.userId, userId)
-        )
+  const existing = await db
+    .select()
+    .from(schema.portAllocations)
+    .where(
+      and(
+        eq(schema.portAllocations.id, portId),
+        eq(schema.portAllocations.userId, userId)
       )
-      .get();
+    )
+    .get();
 
-    if (!existing) {
-      return c.json({ error: "Port allocation not found" }, 404);
-    }
-
-    await db
-      .delete(schema.portAllocations)
-      .where(eq(schema.portAllocations.id, portId));
-
-    logActivity(c, {
-      event: "user:ports:delete",
-      metadata: {
-        targetUserId: userId,
-        nodeId: existing.nodeId,
-        range: `${existing.startPort}-${existing.endPort}`,
-      },
-    });
-
-    return c.body(null, 204);
+  if (!existing) {
+    return c.json({ error: "Port allocation not found" }, 404);
   }
-);
+
+  await db
+    .delete(schema.portAllocations)
+    .where(eq(schema.portAllocations.id, portId));
+
+  logActivity(c, {
+    event: "user:ports:delete",
+    metadata: {
+      targetUserId: userId,
+      nodeId: existing.nodeId,
+      range: `${existing.startPort}-${existing.endPort}`,
+    },
+  });
+
+  return c.body(null, 204);
+});

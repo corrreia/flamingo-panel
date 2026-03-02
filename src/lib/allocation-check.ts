@@ -51,10 +51,7 @@ export async function checkUserAllocations(
       `Server limit exceeded (${currentServers}/${allocation.servers})`
     );
   }
-  if (
-    allocation.cpu > 0 &&
-    currentCpu + requested.cpu > allocation.cpu
-  ) {
+  if (allocation.cpu > 0 && currentCpu + requested.cpu > allocation.cpu) {
     violations.push(
       `CPU limit exceeded (${currentCpu + requested.cpu}% / ${allocation.cpu}% allowed)`
     );
@@ -67,10 +64,7 @@ export async function checkUserAllocations(
       `Memory limit exceeded (${currentMemory + requested.memory} MB / ${allocation.memory} MB allowed)`
     );
   }
-  if (
-    allocation.disk > 0 &&
-    currentDisk + requested.disk > allocation.disk
-  ) {
+  if (allocation.disk > 0 && currentDisk + requested.disk > allocation.disk) {
     violations.push(
       `Disk limit exceeded (${currentDisk + requested.disk} MB / ${allocation.disk} MB allowed)`
     );

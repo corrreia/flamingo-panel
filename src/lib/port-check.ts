@@ -75,9 +75,7 @@ export async function isPortInUserRange(
     return { hasRanges: false, allowed: true };
   }
 
-  const allowed = ranges.some(
-    (r) => port >= r.startPort && port <= r.endPort
-  );
+  const allowed = ranges.some((r) => port >= r.startPort && port <= r.endPort);
   return { hasRanges: true, allowed };
 }
 
@@ -111,7 +109,9 @@ export async function findOverlappingRanges(
     .all();
 
   return allRanges.filter((r) => {
-    if (excludeId && r.id === excludeId) return false;
+    if (excludeId && r.id === excludeId) {
+      return false;
+    }
     // Two ranges overlap if start1 <= end2 AND start2 <= end1
     return startPort <= r.endPort && r.startPort <= endPort;
   });

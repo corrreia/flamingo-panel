@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
 import {
   Popover,
@@ -14,26 +13,26 @@ import {
   Bell,
   Check,
   CheckCheck,
+  Cpu,
   Info,
+  Network,
   OctagonAlert,
   Server,
   Trash2,
-  Network,
-  Cpu,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 interface Notification {
-  id: string;
-  userId: string;
   category: string;
+  createdAt: string;
+  id: string;
   level: string;
-  title: string;
   message: string;
   metadata: string;
   readAt: string | null;
-  createdAt: string;
+  title: string;
+  userId: string;
 }
 
 const categoryIcons: Record<string, React.ElementType> = {
@@ -54,15 +53,23 @@ function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr).getTime();
   const diff = now - date;
 
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) {
+    return "just now";
+  }
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
 
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) {
+    return `${days}d ago`;
+  }
 
   return new Date(dateStr).toLocaleDateString();
 }
@@ -73,21 +80,18 @@ export function NotificationBell() {
 
   const { data: countData } = useQuery({
     queryKey: ["notifications", "unread-count"],
-    queryFn: () =>
-      api.get<{ count: number }>("/notifications/unread-count"),
+    queryFn: () => api.get<{ count: number }>("/notifications/unread-count"),
     refetchInterval: 30_000,
   });
 
   const { data: notificationsData, isLoading } = useQuery({
     queryKey: ["notifications"],
-    queryFn: () =>
-      api.get<{ data: Notification[] }>("/notifications?limit=20"),
+    queryFn: () => api.get<{ data: Notification[] }>("/notifications?limit=20"),
     enabled: open,
   });
 
   const markRead = useMutation({
-    mutationFn: (id: string) =>
-      api.put(`/notifications/${id}/read`),
+    mutationFn: (id: string) => api.put(`/notifications/${id}/read`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({
@@ -109,8 +113,7 @@ export function NotificationBell() {
   });
 
   const deleteNotification = useMutation({
-    mutationFn: (id: string) =>
-      api.delete(`/notifications/${id}`),
+    mutationFn: (id: string) => api.delete(`/notifications/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({
@@ -124,9 +127,9 @@ export function NotificationBell() {
   const notifications = notificationsData?.data ?? [];
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8">
+        <Button className="relative h-8 w-8" size="icon" variant="ghost">
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 font-bold text-[10px] text-white">
@@ -141,11 +144,11 @@ export function NotificationBell() {
           <h3 className="font-semibold text-sm">Notifications</h3>
           {unreadCount > 0 && (
             <Button
-              variant="ghost"
-              size="sm"
               className="h-7 text-xs"
-              onClick={() => markAllRead.mutate()}
               disabled={markAllRead.isPending}
+              onClick={() => markAllRead.mutate()}
+              size="sm"
+              variant="ghost"
             >
               <CheckCheck className="mr-1 h-3 w-3" />
               Mark all read
@@ -178,11 +181,11 @@ export function NotificationBell() {
 
                 return (
                   <div
-                    key={n.id}
                     className={cn(
                       "group flex gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
                       !n.readAt && "bg-muted/30"
                     )}
+                    key={n.id}
                   >
                     <div
                       className={cn(
@@ -217,22 +220,22 @@ export function NotificationBell() {
                       <div className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                         {!n.readAt && (
                           <Button
-                            variant="ghost"
-                            size="sm"
                             className="h-6 px-2 text-xs"
-                            onClick={() => markRead.mutate(n.id)}
                             disabled={markRead.isPending}
+                            onClick={() => markRead.mutate(n.id)}
+                            size="sm"
+                            variant="ghost"
                           >
                             <Check className="mr-1 h-3 w-3" />
                             Read
                           </Button>
                         )}
                         <Button
-                          variant="ghost"
-                          size="sm"
                           className="h-6 px-2 text-destructive text-xs hover:text-destructive"
-                          onClick={() => deleteNotification.mutate(n.id)}
                           disabled={deleteNotification.isPending}
+                          onClick={() => deleteNotification.mutate(n.id)}
+                          size="sm"
+                          variant="ghost"
                         >
                           <Trash2 className="mr-1 h-3 w-3" />
                           Delete

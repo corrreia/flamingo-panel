@@ -41,12 +41,12 @@ import { Plus, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface UserItem {
-  id: string;
-  email: string;
-  username: string;
-  role: string;
   createdAt: string;
+  email: string;
+  id: string;
+  role: string;
   serverCount: number;
+  username: string;
 }
 
 interface NodeItem {
@@ -105,9 +105,7 @@ function UsersPage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <Badge
-                        variant={
-                          u.role === "admin" ? "default" : "secondary"
-                        }
+                        variant={u.role === "admin" ? "default" : "secondary"}
                       >
                         {u.role}
                       </Badge>
@@ -151,7 +149,6 @@ function UsersPage() {
   );
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: allocation dialog with port ranges requires many fields
 function AllocationDialog({
   userId,
   username,
@@ -189,7 +186,7 @@ function AllocationDialog({
     queryFn: () => api.get<NodeItem[]>("/nodes"),
   });
 
-  // Populate form when data loads
+  // Populate form when data loads, reset when limits are absent
   useEffect(() => {
     if (data?.limits) {
       setCpu(String(data.limits.cpu));
@@ -200,6 +197,15 @@ function AllocationDialog({
       setBackups(String(data.limits.backups));
       setAllocations(String(data.limits.allocations));
       setAllowOverprovision(data.limits.allowOverprovision === 1);
+    } else if (data) {
+      setCpu("0");
+      setMemory("0");
+      setDisk("0");
+      setServers("0");
+      setDatabases("0");
+      setBackups("0");
+      setAllocations("0");
+      setAllowOverprovision(false);
     }
   }, [data]);
 
@@ -266,7 +272,7 @@ function AllocationDialog({
     const start = Number(portStart);
     const end = Number(portEnd);
     const nodeIdNum = Number(portNodeId);
-    if (!nodeIdNum || !start || !end) {
+    if (!(nodeIdNum && start && end)) {
       setPortError("All fields are required");
       return;
     }

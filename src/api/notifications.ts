@@ -81,7 +81,7 @@ notificationRoutes.put("/read-all", async (c) => {
   const user = c.get("user");
   const db = getDb(c.env.DB);
 
-  await db
+  const updated = await db
     .update(schema.notifications)
     .set({ readAt: new Date().toISOString() })
     .where(
@@ -89,9 +89,10 @@ notificationRoutes.put("/read-all", async (c) => {
         eq(schema.notifications.userId, user.id),
         isNull(schema.notifications.readAt)
       )
-    );
+    )
+    .returning({ id: schema.notifications.id });
 
-  return c.json({ ok: true });
+  return c.json({ ok: true, affected: updated.length });
 });
 
 // DELETE /api/notifications/:id — delete a notification

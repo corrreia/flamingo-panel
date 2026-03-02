@@ -103,8 +103,23 @@ function ResourceUsageCard() {
     queryFn: () => api.get<AllocationResponse>("/allocations/me"),
   });
 
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <Skeleton className="h-5 w-36" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-8" />
+          <Skeleton className="h-8" />
+          <Skeleton className="h-8" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Don't show anything if no limits and no port ranges are set
-  if (isLoading || (!data?.limits && (!data?.portRanges || data.portRanges.length === 0))) {
+  if (!data?.limits && (!data?.portRanges || data.portRanges.length === 0)) {
     return null;
   }
 

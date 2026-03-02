@@ -1,4 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { NotificationBell } from "@web/components/notification-bell";
 import { Avatar, AvatarFallback, AvatarImage } from "@web/components/ui/avatar";
 import { Button } from "@web/components/ui/button";
 import {
@@ -14,7 +15,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@web/components/ui/sheet";
-import { NotificationBell } from "@web/components/notification-bell";
 import { useAuth } from "@web/lib/auth";
 import {
   ClipboardList,
