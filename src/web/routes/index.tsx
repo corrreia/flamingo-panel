@@ -25,6 +25,24 @@ interface ServerItem {
   uuid: string;
 }
 
+interface AllocationLimits {
+  cpu: number;
+  memory: number;
+  disk: number;
+  servers: number;
+  allowOverprovision: number;
+}
+
+interface AllocationResponse {
+  limits: AllocationLimits | null;
+  usage: {
+    servers: number;
+    cpu: number;
+    memory: number;
+    disk: number;
+  };
+}
+
 export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
@@ -51,6 +69,108 @@ function getStatusLabel(s: ServerItem): string {
   return s.containerStatus || "offline";
 }
 
+function UsageBar({
+  label,
+  icon,
+  used,
+  limit,
+  unit,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  used: number;
+  limit: number;
+  unit: string;
+}) {
+  const unlimited = limit === 0;
+  const percent = unlimited ? 0 : Math.min((used / limit) * 100, 100);
+  const overprovisioned = !unlimited && used > limit;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          {icon}
+          {label}
+        </span>
+        <span className="font-medium">
+          {used}
+          {unit} / {unlimited ? "Unlimited" : `${limit}${unit}`}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all ${
+            overprovisioned
+              ? "bg-destructive"
+              : percent > 80
+                ? "bg-yellow-500"
+                : "bg-primary"
+          }`}
+          style={{ width: unlimited ? "0%" : `${Math.min(percent, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ResourceUsageCard() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["my-allocations"],
+    queryFn: () => api.get<AllocationResponse>("/allocations/me"),
+  });
+
+  // Don't show anything if no limits are set
+  if (isLoading || !data?.limits) {
+    return null;
+  }
+
+  const { limits, usage } = data;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Resource Usage</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <UsageBar
+          icon={<Server className="h-3.5 w-3.5" />}
+          label="Servers"
+          limit={limits.servers}
+          unit=""
+          used={usage.servers}
+        />
+        <UsageBar
+          icon={<Cpu className="h-3.5 w-3.5" />}
+          label="CPU"
+          limit={limits.cpu}
+          unit="%"
+          used={usage.cpu}
+        />
+        <UsageBar
+          icon={<MemoryStick className="h-3.5 w-3.5" />}
+          label="Memory"
+          limit={limits.memory}
+          unit=" MB"
+          used={usage.memory}
+        />
+        <UsageBar
+          icon={<HardDrive className="h-3.5 w-3.5" />}
+          label="Disk"
+          limit={limits.disk}
+          unit=" MB"
+          used={usage.disk}
+        />
+        {limits.allowOverprovision === 1 && (
+          <p className="text-muted-foreground text-xs">
+            Overprovisioning is enabled — you may exceed limits with a warning.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DashboardPage() {
   const { data: servers, isLoading } = useQuery({
     queryKey: ["servers"],
@@ -62,6 +182,7 @@ function DashboardPage() {
     <Layout>
       <div className="space-y-6">
         <h1 className="font-bold text-2xl tracking-tight">Your Servers</h1>
+        <ResourceUsageCard />
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (

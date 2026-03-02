@@ -25,6 +25,7 @@ import {
   Plus,
   Server,
   Settings,
+  Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -87,6 +88,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Button asChild size="sm" variant="ghost">
                   <Link to="/admin/activity">
                     <ClipboardList className="mr-2 h-4 w-4" /> Activity
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="ghost">
+                  <Link to="/admin/users">
+                    <Users className="mr-2 h-4 w-4" /> Users
                   </Link>
                 </Button>
               </>
@@ -198,6 +204,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 >
                   <Link to="/admin/activity">
                     <ClipboardList className="mr-2 h-4 w-4" /> Activity
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  className="justify-start"
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Link to="/admin/users">
+                    <Users className="mr-2 h-4 w-4" /> Users
                   </Link>
                 </Button>
                 <Button asChild className="mt-2 justify-start" size="sm">

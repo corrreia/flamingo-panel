@@ -216,6 +216,23 @@ export const notifications = sqliteTable(
   ]
 );
 
+export const userAllocations = sqliteTable("user_allocations", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  cpu: integer("cpu").notNull().default(0), // total CPU % allowed (0 = unlimited)
+  memory: integer("memory").notNull().default(0), // total MB allowed (0 = unlimited)
+  disk: integer("disk").notNull().default(0), // total MB allowed (0 = unlimited)
+  servers: integer("servers").notNull().default(0), // max servers (0 = unlimited)
+  databases: integer("databases").notNull().default(0), // max databases (0 = unlimited)
+  backups: integer("backups").notNull().default(0), // max backups (0 = unlimited)
+  allocations: integer("allocations").notNull().default(0), // max extra allocations (0 = unlimited)
+  allowOverprovision: integer("allow_overprovision").notNull().default(0), // 0 = block, 1 = allow with warning
+  ...timestamps,
+});
+
 export const wingsActivityLogs = sqliteTable(
   "wings_activity_logs",
   {

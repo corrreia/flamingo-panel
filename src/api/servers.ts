@@ -4,6 +4,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
+import { checkUserAllocations } from "../lib/allocation-check";
+import { queueNotification } from "../lib/notifications";
 import { getServerAccess } from "../lib/server-access";
 import { type ServerApiResponse, WingsClient } from "../lib/wings-client";
 import { signWingsWebsocketToken, WS_PERMISSIONS } from "../lib/wings-jwt";
@@ -87,6 +89,34 @@ serverRoutes.post(
       .get();
     if (!owner) {
       return c.json({ error: "User not found" }, 404);
+    }
+
+    // Check user resource allocations
+    const allocationCheck = await checkUserAllocations(db, data.ownerId, {
+      cpu: data.cpu,
+      memory: data.memory,
+      disk: data.disk,
+    });
+
+    if (!allocationCheck.allowed) {
+      return c.json(
+        {
+          error: "Resource allocation limits exceeded",
+          violations: allocationCheck.violations,
+        },
+        403
+      );
+    }
+
+    if (allocationCheck.overprovisioned) {
+      // Notify the user that they are overprovisioned
+      queueNotification(c, {
+        userId: data.ownerId,
+        category: "resource",
+        level: "warning",
+        title: "Resource limits exceeded",
+        message: `Server "${data.name}" was created but exceeds your allocated resources: ${allocationCheck.violations.join(", ")}`,
+      });
     }
 
     const server = await db
