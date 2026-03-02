@@ -30,7 +30,7 @@ export const DRAG_MIME = "application/x-flamingo-files";
 function useDropZone(
   targetDir: string,
   onMove: FileTableProps["onMoveToDir"],
-  isValid: () => boolean,
+  isValid: () => boolean
 ) {
   const [over, setOver] = useState(false);
   const counter = useRef(0);
@@ -85,7 +85,7 @@ interface FileTableProps {
   onMoveToDir: (
     fileNames: string[],
     sourceDir: string,
-    targetDir: string,
+    targetDir: string
   ) => void;
   onNavigate: (dir: string) => void;
   onOpen: (name: string) => void;
@@ -111,7 +111,7 @@ function ParentDirRow({
   const { over, handlers } = useDropZone(
     parentDir,
     onMoveToDir,
-    () => activeDrag !== null,
+    () => activeDrag !== null
   );
 
   return (
@@ -173,9 +173,7 @@ function FileTableRow({
     targetDir,
     onMoveToDir,
     () =>
-      file.directory &&
-      !!activeDrag &&
-      !activeDrag.files.includes(file.name),
+      file.directory && !!activeDrag && !activeDrag.files.includes(file.name)
   );
 
   const handleActivate = () => {
@@ -200,9 +198,7 @@ function FileTableRow({
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const dropClass = over
-    ? "bg-primary/5 ring-2 ring-primary ring-inset"
-    : "";
+  const dropClass = over ? "bg-primary/5 ring-2 ring-primary ring-inset" : "";
 
   return (
     <TableRow

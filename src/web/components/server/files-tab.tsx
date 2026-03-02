@@ -588,14 +588,16 @@ export function FilesTab({ serverId }: { serverId: string }) {
               onClick={() => navigateDir("/")}
               onDragEnter={(e) => {
                 e.preventDefault();
-                crumbCounters.current["/"] = (crumbCounters.current["/"] ?? 0) + 1;
+                crumbCounters.current["/"] =
+                  (crumbCounters.current["/"] ?? 0) + 1;
                 if (crumbCounters.current["/"] === 1) {
                   setDragOverCrumb("/");
                 }
               }}
               onDragLeave={(e) => {
                 e.preventDefault();
-                crumbCounters.current["/"] = (crumbCounters.current["/"] ?? 1) - 1;
+                crumbCounters.current["/"] =
+                  (crumbCounters.current["/"] ?? 1) - 1;
                 if (crumbCounters.current["/"] === 0) {
                   setDragOverCrumb(null);
                 }
@@ -631,14 +633,16 @@ export function FilesTab({ serverId }: { serverId: string }) {
                     onClick={() => navigateDir(crumb.path)}
                     onDragEnter={(e) => {
                       e.preventDefault();
-                      crumbCounters.current[crumb.path] = (crumbCounters.current[crumb.path] ?? 0) + 1;
+                      crumbCounters.current[crumb.path] =
+                        (crumbCounters.current[crumb.path] ?? 0) + 1;
                       if (crumbCounters.current[crumb.path] === 1) {
                         setDragOverCrumb(crumb.path);
                       }
                     }}
                     onDragLeave={(e) => {
                       e.preventDefault();
-                      crumbCounters.current[crumb.path] = (crumbCounters.current[crumb.path] ?? 1) - 1;
+                      crumbCounters.current[crumb.path] =
+                        (crumbCounters.current[crumb.path] ?? 1) - 1;
                       if (crumbCounters.current[crumb.path] === 0) {
                         setDragOverCrumb(null);
                       }
