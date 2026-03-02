@@ -62,7 +62,7 @@ notificationRoutes.put("/:id/read", async (c) => {
   const db = getDb(c.env.DB);
   const id = c.req.param("id");
 
-  await db
+  const updated = await db
     .update(schema.notifications)
     .set({ readAt: new Date().toISOString() })
     .where(
@@ -70,9 +70,10 @@ notificationRoutes.put("/:id/read", async (c) => {
         eq(schema.notifications.id, id),
         eq(schema.notifications.userId, user.id)
       )
-    );
+    )
+    .returning({ id: schema.notifications.id });
 
-  return c.json({ ok: true });
+  return c.json({ ok: true, affected: updated.length });
 });
 
 // PUT /api/notifications/read-all — mark all as read
@@ -99,14 +100,15 @@ notificationRoutes.delete("/:id", async (c) => {
   const db = getDb(c.env.DB);
   const id = c.req.param("id");
 
-  await db
+  const deleted = await db
     .delete(schema.notifications)
     .where(
       and(
         eq(schema.notifications.id, id),
         eq(schema.notifications.userId, user.id)
       )
-    );
+    )
+    .returning({ id: schema.notifications.id });
 
-  return c.json({ ok: true });
+  return c.json({ ok: true, affected: deleted.length });
 });

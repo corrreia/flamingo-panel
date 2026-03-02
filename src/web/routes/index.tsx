@@ -11,6 +11,7 @@ import {
 } from "@web/components/ui/card";
 import { Skeleton } from "@web/components/ui/skeleton";
 import { api } from "@web/lib/api";
+import type { AllocationResponse } from "@web/lib/types";
 import { Cpu, HardDrive, MemoryStick, Network, Server } from "lucide-react";
 
 interface ServerItem {
@@ -23,32 +24,6 @@ interface ServerItem {
   role: "admin" | "owner" | "subuser";
   status: string | null;
   uuid: string;
-}
-
-interface AllocationLimits {
-  cpu: number;
-  memory: number;
-  disk: number;
-  servers: number;
-  allowOverprovision: number;
-}
-
-interface PortRange {
-  id: string;
-  nodeId: number;
-  startPort: number;
-  endPort: number;
-}
-
-interface AllocationResponse {
-  limits: AllocationLimits | null;
-  usage: {
-    servers: number;
-    cpu: number;
-    memory: number;
-    disk: number;
-  };
-  portRanges: PortRange[];
 }
 
 export const Route = createFileRoute("/")({
@@ -134,14 +109,6 @@ function ResourceUsageCard() {
   }
 
   const { limits, usage, portRanges } = data;
-
-  // Group port ranges by nodeId
-  const portsByNode = new Map<number, PortRange[]>();
-  for (const pr of portRanges) {
-    const existing = portsByNode.get(pr.nodeId) ?? [];
-    existing.push(pr);
-    portsByNode.set(pr.nodeId, existing);
-  }
 
   return (
     <Card>

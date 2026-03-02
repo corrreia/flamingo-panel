@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "@web/components/ui/table";
 import { api } from "@web/lib/api";
+import type { AllocationResponse } from "@web/lib/types";
 import { Plus, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -46,38 +47,6 @@ interface UserItem {
   role: string;
   createdAt: string;
   serverCount: number;
-}
-
-interface AllocationLimits {
-  id: string;
-  userId: string;
-  cpu: number;
-  memory: number;
-  disk: number;
-  servers: number;
-  databases: number;
-  backups: number;
-  allocations: number;
-  allowOverprovision: number;
-}
-
-interface PortRange {
-  id: string;
-  userId: string;
-  nodeId: number;
-  startPort: number;
-  endPort: number;
-}
-
-interface AllocationResponse {
-  limits: AllocationLimits | null;
-  usage: {
-    servers: number;
-    cpu: number;
-    memory: number;
-    disk: number;
-  };
-  portRanges: PortRange[];
 }
 
 interface NodeItem {
@@ -274,6 +243,7 @@ function AllocationDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allocations", userId] });
     },
+    onError: (err: Error) => setPortError(err.message),
   });
 
   const handleSave = (e: React.FormEvent) => {

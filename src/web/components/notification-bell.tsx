@@ -22,6 +22,7 @@ import {
   Cpu,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface Notification {
   id: string;
@@ -93,6 +94,7 @@ export function NotificationBell() {
         queryKey: ["notifications", "unread-count"],
       });
     },
+    onError: () => toast.error("Failed to mark notification as read"),
   });
 
   const markAllRead = useMutation({
@@ -103,6 +105,7 @@ export function NotificationBell() {
         queryKey: ["notifications", "unread-count"],
       });
     },
+    onError: () => toast.error("Failed to mark all notifications as read"),
   });
 
   const deleteNotification = useMutation({
@@ -114,6 +117,7 @@ export function NotificationBell() {
         queryKey: ["notifications", "unread-count"],
       });
     },
+    onError: () => toast.error("Failed to delete notification"),
   });
 
   const unreadCount = countData?.count ?? 0;

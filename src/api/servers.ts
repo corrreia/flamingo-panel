@@ -6,7 +6,7 @@ import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
 import { checkUserAllocations } from "../lib/allocation-check";
 import { queueNotification } from "../lib/notifications";
-import { isPortAvailableOnNode, isPortInUserRange } from "../lib/port-check";
+import { isPortInUserRange } from "../lib/port-check";
 import { getServerAccess } from "../lib/server-access";
 import { type ServerApiResponse, WingsClient } from "../lib/wings-client";
 import { signWingsWebsocketToken, WS_PERMISSIONS } from "../lib/wings-jwt";
@@ -120,21 +120,6 @@ serverRoutes.post(
       });
     }
 
-    // Check port is not already in use on this node
-    const portAvailable = await isPortAvailableOnNode(
-      db,
-      data.nodeId,
-      data.defaultAllocationPort
-    );
-    if (!portAvailable) {
-      return c.json(
-        {
-          error: `Port ${data.defaultAllocationPort} is already in use on this node`,
-        },
-        409
-      );
-    }
-
     // Check port falls within the user's allocated port ranges (if any)
     const portRangeCheck = await isPortInUserRange(
       db,
@@ -151,43 +136,84 @@ serverRoutes.post(
       );
     }
 
-    const server = await db
-      .insert(schema.servers)
-      .values({
-        name: data.name,
-        description: data.description || "",
-        nodeId: data.nodeId,
-        ownerId: data.ownerId,
-        eggId: data.eggId,
-        memory: data.memory,
-        disk: data.disk,
-        cpu: data.cpu,
-        swap: data.swap,
-        io: data.io,
-        defaultAllocationPort: data.defaultAllocationPort,
-        startup: data.startup || egg.startup,
-        image: data.image || egg.dockerImage,
-        status: "installing",
-        containerStatus: "offline",
-      })
-      .returning()
-      .get();
+    // Atomically check port availability and create server + variables
+    const server = await db.transaction(async (tx) => {
+      // Check port is not already in use on this node
+      const nodeServers = await tx
+        .select({
+          defaultAllocationPort: schema.servers.defaultAllocationPort,
+          additionalAllocations: schema.servers.additionalAllocations,
+        })
+        .from(schema.servers)
+        .where(eq(schema.servers.nodeId, data.nodeId))
+        .all();
 
-    // Save egg variables with defaults
-    if (data.variables || egg) {
-      const eggVars = await db
+      const usedPorts = new Set<number>();
+      for (const s of nodeServers) {
+        usedPorts.add(s.defaultAllocationPort);
+        try {
+          const extra = JSON.parse(
+            s.additionalAllocations || "[]"
+          ) as unknown[];
+          for (const port of extra) {
+            if (typeof port === "number") usedPorts.add(port);
+          }
+        } catch {
+          // invalid JSON — skip
+        }
+      }
+
+      if (usedPorts.has(data.defaultAllocationPort)) {
+        return null;
+      }
+
+      const created = await tx
+        .insert(schema.servers)
+        .values({
+          name: data.name,
+          description: data.description || "",
+          nodeId: data.nodeId,
+          ownerId: data.ownerId,
+          eggId: data.eggId,
+          memory: data.memory,
+          disk: data.disk,
+          cpu: data.cpu,
+          swap: data.swap,
+          io: data.io,
+          defaultAllocationPort: data.defaultAllocationPort,
+          startup: data.startup || egg.startup,
+          image: data.image || egg.dockerImage,
+          status: "installing",
+          containerStatus: "offline",
+        })
+        .returning()
+        .get();
+
+      // Save egg variables with defaults
+      const eggVars = await tx
         .select()
         .from(schema.eggVariables)
         .where(eq(schema.eggVariables.eggId, data.eggId))
         .all();
       for (const ev of eggVars) {
-        await db.insert(schema.serverVariables).values({
-          serverId: server.id,
+        await tx.insert(schema.serverVariables).values({
+          serverId: created.id,
           variableId: ev.id,
           variableValue:
             data.variables?.[ev.envVariable] || ev.defaultValue || "",
         });
       }
+
+      return created;
+    });
+
+    if (!server) {
+      return c.json(
+        {
+          error: `Port ${data.defaultAllocationPort} is already in use on this node`,
+        },
+        409
+      );
     }
 
     // Tell Wings to install the server

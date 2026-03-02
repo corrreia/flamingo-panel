@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { getDb, schema } from "../db";
+import { type Database, getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
 import { findOverlappingRanges } from "../lib/port-check";
 import { type AuthUser, requireAdmin, requireAuth } from "./middleware/auth";
@@ -14,63 +14,8 @@ export const allocationRoutes = new Hono<{
 
 allocationRoutes.use("*", requireAuth);
 
-// Get allocations for the current user (any authenticated user)
-allocationRoutes.get("/me", async (c) => {
-  const user = c.get("user");
-  const db = getDb(c.env.DB);
-
-  const allocation = await db
-    .select()
-    .from(schema.userAllocations)
-    .where(eq(schema.userAllocations.userId, user.id))
-    .get();
-
-  // Calculate current usage
-  const usage = await db
-    .select({
-      serverCount: sql<number>`count(*)`,
-      cpuUsed: sql<number>`coalesce(sum(${schema.servers.cpu}), 0)`,
-      memoryUsed: sql<number>`coalesce(sum(${schema.servers.memory}), 0)`,
-      diskUsed: sql<number>`coalesce(sum(${schema.servers.disk}), 0)`,
-    })
-    .from(schema.servers)
-    .where(eq(schema.servers.ownerId, user.id))
-    .get();
-
-  // Fetch port ranges assigned to this user
-  const portRanges = await db
-    .select()
-    .from(schema.portAllocations)
-    .where(eq(schema.portAllocations.userId, user.id))
-    .all();
-
-  return c.json({
-    limits: allocation || null,
-    usage: {
-      servers: usage?.serverCount ?? 0,
-      cpu: usage?.cpuUsed ?? 0,
-      memory: usage?.memoryUsed ?? 0,
-      disk: usage?.diskUsed ?? 0,
-    },
-    portRanges,
-  });
-});
-
-// Get allocations for a specific user (admin only)
-allocationRoutes.get("/:userId", requireAdmin, async (c) => {
-  const db = getDb(c.env.DB);
-  const userId = c.req.param("userId");
-
-  const userRow = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .get();
-  if (!userRow) {
-    return c.json({ error: "User not found" }, 404);
-  }
-
-  const allocation = await db
+async function getUserAllocationsData(db: Database, userId: string) {
+  const limits = await db
     .select()
     .from(schema.userAllocations)
     .where(eq(schema.userAllocations.userId, userId))
@@ -93,8 +38,8 @@ allocationRoutes.get("/:userId", requireAdmin, async (c) => {
     .where(eq(schema.portAllocations.userId, userId))
     .all();
 
-  return c.json({
-    limits: allocation || null,
+  return {
+    limits: limits || null,
     usage: {
       servers: usage?.serverCount ?? 0,
       cpu: usage?.cpuUsed ?? 0,
@@ -102,7 +47,31 @@ allocationRoutes.get("/:userId", requireAdmin, async (c) => {
       disk: usage?.diskUsed ?? 0,
     },
     portRanges,
-  });
+  };
+}
+
+// Get allocations for the current user (any authenticated user)
+allocationRoutes.get("/me", async (c) => {
+  const user = c.get("user");
+  const db = getDb(c.env.DB);
+  return c.json(await getUserAllocationsData(db, user.id));
+});
+
+// Get allocations for a specific user (admin only)
+allocationRoutes.get("/:userId", requireAdmin, async (c) => {
+  const db = getDb(c.env.DB);
+  const userId = c.req.param("userId");
+
+  const userRow = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .get();
+  if (!userRow) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  return c.json(await getUserAllocationsData(db, userId));
 });
 
 const allocationSchema = z.object({
@@ -135,12 +104,6 @@ allocationRoutes.put(
       return c.json({ error: "User not found" }, 404);
     }
 
-    const existing = await db
-      .select({ id: schema.userAllocations.id })
-      .from(schema.userAllocations)
-      .where(eq(schema.userAllocations.userId, userId))
-      .get();
-
     const values = {
       cpu: data.cpu,
       memory: data.memory,
@@ -153,21 +116,15 @@ allocationRoutes.put(
       updatedAt: new Date().toISOString(),
     };
 
-    let allocation;
-    if (existing) {
-      allocation = await db
-        .update(schema.userAllocations)
-        .set(values)
-        .where(eq(schema.userAllocations.userId, userId))
-        .returning()
-        .get();
-    } else {
-      allocation = await db
-        .insert(schema.userAllocations)
-        .values({ userId, ...values })
-        .returning()
-        .get();
-    }
+    const allocation = await db
+      .insert(schema.userAllocations)
+      .values({ userId, ...values })
+      .onConflictDoUpdate({
+        target: schema.userAllocations.userId,
+        set: values,
+      })
+      .returning()
+      .get();
 
     logActivity(c, {
       event: "user:allocations:update",
@@ -197,11 +154,16 @@ allocationRoutes.delete("/:userId", requireAdmin, async (c) => {
 
 // ─── Port Allocation Routes ──────────────────────────────────────────────────
 
-const portRangeSchema = z.object({
-  nodeId: z.number().int().min(1),
-  startPort: z.number().int().min(1).max(65_535),
-  endPort: z.number().int().min(1).max(65_535),
-});
+const portRangeSchema = z
+  .object({
+    nodeId: z.number().int().min(1),
+    startPort: z.number().int().min(1).max(65_535),
+    endPort: z.number().int().min(1).max(65_535),
+  })
+  .refine((data) => data.startPort <= data.endPort, {
+    message: "Start port must be less than or equal to end port",
+    path: ["startPort"],
+  });
 
 // Add a port range for a user (admin only)
 allocationRoutes.post(
@@ -212,13 +174,6 @@ allocationRoutes.post(
     const db = getDb(c.env.DB);
     const userId = c.req.param("userId");
     const data = c.req.valid("json");
-
-    if (data.startPort > data.endPort) {
-      return c.json(
-        { error: "Start port must be less than or equal to end port" },
-        400
-      );
-    }
 
     // Validate user exists
     const userRow = await db
