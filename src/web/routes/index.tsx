@@ -11,7 +11,7 @@ import {
 } from "@web/components/ui/card";
 import { Skeleton } from "@web/components/ui/skeleton";
 import { api } from "@web/lib/api";
-import { Cpu, HardDrive, MemoryStick, Server } from "lucide-react";
+import { Cpu, HardDrive, MemoryStick, Network, Server } from "lucide-react";
 
 interface ServerItem {
   containerStatus: string | null;
@@ -33,6 +33,13 @@ interface AllocationLimits {
   allowOverprovision: number;
 }
 
+interface PortRange {
+  id: string;
+  nodeId: number;
+  startPort: number;
+  endPort: number;
+}
+
 interface AllocationResponse {
   limits: AllocationLimits | null;
   usage: {
@@ -41,6 +48,7 @@ interface AllocationResponse {
     memory: number;
     disk: number;
   };
+  portRanges: PortRange[];
 }
 
 export const Route = createFileRoute("/")({
@@ -120,12 +128,20 @@ function ResourceUsageCard() {
     queryFn: () => api.get<AllocationResponse>("/allocations/me"),
   });
 
-  // Don't show anything if no limits are set
-  if (isLoading || !data?.limits) {
+  // Don't show anything if no limits and no port ranges are set
+  if (isLoading || (!data?.limits && (!data?.portRanges || data.portRanges.length === 0))) {
     return null;
   }
 
-  const { limits, usage } = data;
+  const { limits, usage, portRanges } = data;
+
+  // Group port ranges by nodeId
+  const portsByNode = new Map<number, PortRange[]>();
+  for (const pr of portRanges) {
+    const existing = portsByNode.get(pr.nodeId) ?? [];
+    existing.push(pr);
+    portsByNode.set(pr.nodeId, existing);
+  }
 
   return (
     <Card>
@@ -133,38 +149,63 @@ function ResourceUsageCard() {
         <CardTitle className="text-base">Resource Usage</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <UsageBar
-          icon={<Server className="h-3.5 w-3.5" />}
-          label="Servers"
-          limit={limits.servers}
-          unit=""
-          used={usage.servers}
-        />
-        <UsageBar
-          icon={<Cpu className="h-3.5 w-3.5" />}
-          label="CPU"
-          limit={limits.cpu}
-          unit="%"
-          used={usage.cpu}
-        />
-        <UsageBar
-          icon={<MemoryStick className="h-3.5 w-3.5" />}
-          label="Memory"
-          limit={limits.memory}
-          unit=" MB"
-          used={usage.memory}
-        />
-        <UsageBar
-          icon={<HardDrive className="h-3.5 w-3.5" />}
-          label="Disk"
-          limit={limits.disk}
-          unit=" MB"
-          used={usage.disk}
-        />
-        {limits.allowOverprovision === 1 && (
-          <p className="text-muted-foreground text-xs">
-            Overprovisioning is enabled — you may exceed limits with a warning.
-          </p>
+        {limits && (
+          <>
+            <UsageBar
+              icon={<Server className="h-3.5 w-3.5" />}
+              label="Servers"
+              limit={limits.servers}
+              unit=""
+              used={usage.servers}
+            />
+            <UsageBar
+              icon={<Cpu className="h-3.5 w-3.5" />}
+              label="CPU"
+              limit={limits.cpu}
+              unit="%"
+              used={usage.cpu}
+            />
+            <UsageBar
+              icon={<MemoryStick className="h-3.5 w-3.5" />}
+              label="Memory"
+              limit={limits.memory}
+              unit=" MB"
+              used={usage.memory}
+            />
+            <UsageBar
+              icon={<HardDrive className="h-3.5 w-3.5" />}
+              label="Disk"
+              limit={limits.disk}
+              unit=" MB"
+              used={usage.disk}
+            />
+            {limits.allowOverprovision === 1 && (
+              <p className="text-muted-foreground text-xs">
+                Overprovisioning is enabled — you may exceed limits with a
+                warning.
+              </p>
+            )}
+          </>
+        )}
+        {portRanges.length > 0 && (
+          <div className="space-y-1 pt-1">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+              <Network className="h-3.5 w-3.5" />
+              Assigned Ports
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {portRanges.map((pr) => (
+                <span
+                  className="rounded bg-muted px-2 py-0.5 font-mono text-xs"
+                  key={pr.id}
+                >
+                  {pr.startPort === pr.endPort
+                    ? pr.startPort
+                    : `${pr.startPort}–${pr.endPort}`}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

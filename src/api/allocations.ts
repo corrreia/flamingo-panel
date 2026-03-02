@@ -1,9 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
+import { findOverlappingRanges } from "../lib/port-check";
 import { type AuthUser, requireAdmin, requireAuth } from "./middleware/auth";
 
 export const allocationRoutes = new Hono<{
@@ -36,6 +37,13 @@ allocationRoutes.get("/me", async (c) => {
     .where(eq(schema.servers.ownerId, user.id))
     .get();
 
+  // Fetch port ranges assigned to this user
+  const portRanges = await db
+    .select()
+    .from(schema.portAllocations)
+    .where(eq(schema.portAllocations.userId, user.id))
+    .all();
+
   return c.json({
     limits: allocation || null,
     usage: {
@@ -44,6 +52,7 @@ allocationRoutes.get("/me", async (c) => {
       memory: usage?.memoryUsed ?? 0,
       disk: usage?.diskUsed ?? 0,
     },
+    portRanges,
   });
 });
 
@@ -78,6 +87,12 @@ allocationRoutes.get("/:userId", requireAdmin, async (c) => {
     .where(eq(schema.servers.ownerId, userId))
     .get();
 
+  const portRanges = await db
+    .select()
+    .from(schema.portAllocations)
+    .where(eq(schema.portAllocations.userId, userId))
+    .all();
+
   return c.json({
     limits: allocation || null,
     usage: {
@@ -86,6 +101,7 @@ allocationRoutes.get("/:userId", requireAdmin, async (c) => {
       memory: usage?.memoryUsed ?? 0,
       disk: usage?.diskUsed ?? 0,
     },
+    portRanges,
   });
 });
 
@@ -178,3 +194,147 @@ allocationRoutes.delete("/:userId", requireAdmin, async (c) => {
 
   return c.body(null, 204);
 });
+
+// ─── Port Allocation Routes ──────────────────────────────────────────────────
+
+const portRangeSchema = z.object({
+  nodeId: z.number().int().min(1),
+  startPort: z.number().int().min(1).max(65_535),
+  endPort: z.number().int().min(1).max(65_535),
+});
+
+// Add a port range for a user (admin only)
+allocationRoutes.post(
+  "/:userId/ports",
+  requireAdmin,
+  zValidator("json", portRangeSchema),
+  async (c) => {
+    const db = getDb(c.env.DB);
+    const userId = c.req.param("userId");
+    const data = c.req.valid("json");
+
+    if (data.startPort > data.endPort) {
+      return c.json(
+        { error: "Start port must be less than or equal to end port" },
+        400
+      );
+    }
+
+    // Validate user exists
+    const userRow = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .get();
+    if (!userRow) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    // Validate node exists
+    const nodeRow = await db
+      .select({ id: schema.nodes.id })
+      .from(schema.nodes)
+      .where(eq(schema.nodes.id, data.nodeId))
+      .get();
+    if (!nodeRow) {
+      return c.json({ error: "Node not found" }, 404);
+    }
+
+    // Check for overlapping ranges on this node (from any user)
+    const overlaps = await findOverlappingRanges(
+      db,
+      data.nodeId,
+      data.startPort,
+      data.endPort
+    );
+    if (overlaps.length > 0) {
+      return c.json(
+        {
+          error: "Port range overlaps with existing allocation",
+          conflicts: overlaps.map((o) => ({
+            userId: o.userId,
+            range: `${o.startPort}-${o.endPort}`,
+          })),
+        },
+        409
+      );
+    }
+
+    const portRange = await db
+      .insert(schema.portAllocations)
+      .values({
+        userId,
+        nodeId: data.nodeId,
+        startPort: data.startPort,
+        endPort: data.endPort,
+      })
+      .returning()
+      .get();
+
+    logActivity(c, {
+      event: "user:ports:create",
+      metadata: {
+        targetUserId: userId,
+        nodeId: data.nodeId,
+        range: `${data.startPort}-${data.endPort}`,
+      },
+    });
+
+    return c.json(portRange, 201);
+  }
+);
+
+// List port ranges for a user (admin only)
+allocationRoutes.get("/:userId/ports", requireAdmin, async (c) => {
+  const db = getDb(c.env.DB);
+  const userId = c.req.param("userId");
+
+  const ranges = await db
+    .select()
+    .from(schema.portAllocations)
+    .where(eq(schema.portAllocations.userId, userId))
+    .all();
+
+  return c.json(ranges);
+});
+
+// Delete a specific port range (admin only)
+allocationRoutes.delete(
+  "/:userId/ports/:portId",
+  requireAdmin,
+  async (c) => {
+    const db = getDb(c.env.DB);
+    const userId = c.req.param("userId");
+    const portId = c.req.param("portId");
+
+    const existing = await db
+      .select()
+      .from(schema.portAllocations)
+      .where(
+        and(
+          eq(schema.portAllocations.id, portId),
+          eq(schema.portAllocations.userId, userId)
+        )
+      )
+      .get();
+
+    if (!existing) {
+      return c.json({ error: "Port allocation not found" }, 404);
+    }
+
+    await db
+      .delete(schema.portAllocations)
+      .where(eq(schema.portAllocations.id, portId));
+
+    logActivity(c, {
+      event: "user:ports:delete",
+      metadata: {
+        targetUserId: userId,
+        nodeId: existing.nodeId,
+        range: `${existing.startPort}-${existing.endPort}`,
+      },
+    });
+
+    return c.body(null, 204);
+  }
+);

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { EmptyState } from "@web/components/empty-state";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
@@ -17,6 +17,14 @@ import {
 } from "@web/components/ui/dialog";
 import { Input } from "@web/components/ui/input";
 import { Label } from "@web/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@web/components/ui/select";
+import { Separator } from "@web/components/ui/separator";
 import { Skeleton } from "@web/components/ui/skeleton";
 import { Switch } from "@web/components/ui/switch";
 import {
@@ -28,7 +36,7 @@ import {
   TableRow,
 } from "@web/components/ui/table";
 import { api } from "@web/lib/api";
-import { Cpu, HardDrive, MemoryStick, Server, Users } from "lucide-react";
+import { Plus, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface UserItem {
@@ -53,6 +61,14 @@ interface AllocationLimits {
   allowOverprovision: number;
 }
 
+interface PortRange {
+  id: string;
+  userId: string;
+  nodeId: number;
+  startPort: number;
+  endPort: number;
+}
+
 interface AllocationResponse {
   limits: AllocationLimits | null;
   usage: {
@@ -61,6 +77,12 @@ interface AllocationResponse {
     memory: number;
     disk: number;
   };
+  portRanges: PortRange[];
+}
+
+interface NodeItem {
+  id: number;
+  name: string;
 }
 
 export const Route = createFileRoute("/admin/users")({
@@ -160,6 +182,7 @@ function UsersPage() {
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: allocation dialog with port ranges requires many fields
 function AllocationDialog({
   userId,
   username,
@@ -181,9 +204,20 @@ function AllocationDialog({
   const [allocations, setAllocations] = useState("0");
   const [allowOverprovision, setAllowOverprovision] = useState(false);
 
+  // Port range form
+  const [portNodeId, setPortNodeId] = useState("");
+  const [portStart, setPortStart] = useState("");
+  const [portEnd, setPortEnd] = useState("");
+  const [portError, setPortError] = useState("");
+
   const { data, isLoading } = useQuery({
     queryKey: ["allocations", userId],
     queryFn: () => api.get<AllocationResponse>(`/allocations/${userId}`),
+  });
+
+  const { data: nodes } = useQuery({
+    queryKey: ["nodes"],
+    queryFn: () => api.get<NodeItem[]>("/nodes"),
   });
 
   // Populate form when data loads
@@ -219,6 +253,29 @@ function AllocationDialog({
     onError: (err: Error) => setError(err.message),
   });
 
+  const addPortMutation = useMutation({
+    mutationFn: (values: {
+      nodeId: number;
+      startPort: number;
+      endPort: number;
+    }) => api.post(`/allocations/${userId}/ports`, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allocations", userId] });
+      setPortStart("");
+      setPortEnd("");
+      setPortError("");
+    },
+    onError: (err: Error) => setPortError(err.message),
+  });
+
+  const deletePortMutation = useMutation({
+    mutationFn: (portId: string) =>
+      api.delete(`/allocations/${userId}/ports/${portId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allocations", userId] });
+    },
+  });
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -234,11 +291,35 @@ function AllocationDialog({
     });
   };
 
+  const handleAddPort = () => {
+    setPortError("");
+    const start = Number(portStart);
+    const end = Number(portEnd);
+    const nodeIdNum = Number(portNodeId);
+    if (!nodeIdNum || !start || !end) {
+      setPortError("All fields are required");
+      return;
+    }
+    if (start > end) {
+      setPortError("Start port must be less than or equal to end port");
+      return;
+    }
+    addPortMutation.mutate({
+      nodeId: nodeIdNum,
+      startPort: start,
+      endPort: end,
+    });
+  };
+
   const usage = data?.usage;
+  const portRanges = data?.portRanges ?? [];
+
+  // Map node IDs to names for display
+  const nodeNameMap = new Map((nodes ?? []).map((n) => [n.id, n.name]));
 
   return (
     <Dialog onOpenChange={() => onClose()} open>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Resource Allocations</DialogTitle>
           <DialogDescription>
@@ -383,6 +464,114 @@ function AllocationDialog({
               </Button>
             </DialogFooter>
           </form>
+        )}
+
+        {!isLoading && (
+          <>
+            <Separator />
+
+            <div className="space-y-3">
+              <h3 className="font-medium text-sm">Port Ranges</h3>
+              <p className="text-muted-foreground text-xs">
+                Assign port ranges per node. The user can only create servers
+                using ports within their allocated ranges. Ranges cannot overlap
+                between users on the same node. If no ranges are set, any port
+                is allowed.
+              </p>
+
+              {portRanges.length > 0 && (
+                <div className="space-y-1">
+                  {portRanges.map((pr) => (
+                    <div
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                      key={pr.id}
+                    >
+                      <div>
+                        <span className="font-medium">
+                          {nodeNameMap.get(pr.nodeId) ?? `Node ${pr.nodeId}`}
+                        </span>
+                        <span className="ml-2 font-mono text-muted-foreground">
+                          {pr.startPort}–{pr.endPort}
+                        </span>
+                        <span className="ml-1 text-muted-foreground text-xs">
+                          ({pr.endPort - pr.startPort + 1}{" "}
+                          {pr.endPort - pr.startPort + 1 === 1
+                            ? "port"
+                            : "ports"}
+                          )
+                        </span>
+                      </div>
+                      <Button
+                        disabled={deletePortMutation.isPending}
+                        onClick={() => deletePortMutation.mutate(pr.id)}
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {portError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{portError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Label className="text-xs">Node</Label>
+                  <Select onValueChange={setPortNodeId} value={portNodeId}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Node..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(nodes ?? []).map((n) => (
+                        <SelectItem key={n.id} value={String(n.id)}>
+                          {n.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-24 space-y-1">
+                  <Label className="text-xs">Start</Label>
+                  <Input
+                    className="h-8 text-xs"
+                    max="65535"
+                    min="1"
+                    onChange={(e) => setPortStart(e.target.value)}
+                    placeholder="25565"
+                    type="number"
+                    value={portStart}
+                  />
+                </div>
+                <div className="w-24 space-y-1">
+                  <Label className="text-xs">End</Label>
+                  <Input
+                    className="h-8 text-xs"
+                    max="65535"
+                    min="1"
+                    onChange={(e) => setPortEnd(e.target.value)}
+                    placeholder="25575"
+                    type="number"
+                    value={portEnd}
+                  />
+                </div>
+                <Button
+                  className="h-8"
+                  disabled={addPortMutation.isPending}
+                  onClick={handleAddPort}
+                  size="sm"
+                  type="button"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </DialogContent>
     </Dialog>

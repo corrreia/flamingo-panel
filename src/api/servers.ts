@@ -6,6 +6,7 @@ import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
 import { checkUserAllocations } from "../lib/allocation-check";
 import { queueNotification } from "../lib/notifications";
+import { isPortAvailableOnNode, isPortInUserRange } from "../lib/port-check";
 import { getServerAccess } from "../lib/server-access";
 import { type ServerApiResponse, WingsClient } from "../lib/wings-client";
 import { signWingsWebsocketToken, WS_PERMISSIONS } from "../lib/wings-jwt";
@@ -117,6 +118,37 @@ serverRoutes.post(
         title: "Resource limits exceeded",
         message: `Server "${data.name}" was created but exceeds your allocated resources: ${allocationCheck.violations.join(", ")}`,
       });
+    }
+
+    // Check port is not already in use on this node
+    const portAvailable = await isPortAvailableOnNode(
+      db,
+      data.nodeId,
+      data.defaultAllocationPort
+    );
+    if (!portAvailable) {
+      return c.json(
+        {
+          error: `Port ${data.defaultAllocationPort} is already in use on this node`,
+        },
+        409
+      );
+    }
+
+    // Check port falls within the user's allocated port ranges (if any)
+    const portRangeCheck = await isPortInUserRange(
+      db,
+      data.ownerId,
+      data.nodeId,
+      data.defaultAllocationPort
+    );
+    if (portRangeCheck.hasRanges && !portRangeCheck.allowed) {
+      return c.json(
+        {
+          error: `Port ${data.defaultAllocationPort} is not within this user's allocated port ranges on this node`,
+        },
+        403
+      );
     }
 
     const server = await db

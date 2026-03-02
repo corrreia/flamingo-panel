@@ -233,6 +233,26 @@ export const userAllocations = sqliteTable("user_allocations", {
   ...timestamps,
 });
 
+export const portAllocations = sqliteTable(
+  "port_allocations",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    nodeId: integer("node_id")
+      .notNull()
+      .references(() => nodes.id, { onDelete: "cascade" }),
+    startPort: integer("start_port").notNull(),
+    endPort: integer("end_port").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("idx_port_alloc_user").on(table.userId),
+    index("idx_port_alloc_node").on(table.nodeId),
+  ]
+);
+
 export const wingsActivityLogs = sqliteTable(
   "wings_activity_logs",
   {
