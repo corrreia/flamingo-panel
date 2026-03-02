@@ -292,7 +292,14 @@ remoteRoutes.post("/activity", async (c) => {
     }
   }
 
+  // Events already logged directly by Durable Objects (with real client IP
+  // and real-time timestamps) — skip them here to avoid duplicates.
+  const doLoggedEvents = new Set(["server:console.command"]);
+
   for (const activity of body.data) {
+    if (doLoggedEvents.has(activity.event)) {
+      continue;
+    }
     await db.insert(schema.activityLogs).values({
       userId: activity.user || null,
       serverId: serverMap.get(activity.server) ?? null,
