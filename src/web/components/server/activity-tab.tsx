@@ -16,6 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@web/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@web/components/ui/tabs";
 import { api } from "@web/lib/api";
 import { useState } from "react";
 
@@ -63,7 +69,22 @@ interface ActivityResponse {
   meta: { page: number; perPage: number; total: number };
 }
 
-export function ActivityTab({ serverId }: { serverId: string }) {
+interface WingsActivityEntry {
+  createdAt: string;
+  event: string;
+  id: number;
+  ip: string | null;
+  metadata: string | null;
+  nodeId: number | null;
+  nodeName: string | null;
+}
+
+interface WingsActivityResponse {
+  data: WingsActivityEntry[];
+  meta: { page: number; perPage: number; total: number };
+}
+
+function PanelActivityList({ serverId }: { serverId: string }) {
   const [page, setPage] = useState(0);
 
   const { data, isLoading } = useQuery({
@@ -74,75 +95,172 @@ export function ActivityTab({ serverId }: { serverId: string }) {
       ),
   });
 
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <Skeleton className="h-10" key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Event</TableHead>
+            <TableHead>User</TableHead>
+            <TableHead className="hidden sm:table-cell">IP</TableHead>
+            <TableHead className="text-right">Time</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data?.data.map((entry) => (
+            <TableRow key={entry.id}>
+              <TableCell>
+                <Badge className="font-mono text-xs" variant="secondary">
+                  {entry.event}
+                </Badge>
+                {formatMetadata(entry.metadata) && (
+                  <p className="mt-1 max-w-xs truncate font-mono text-muted-foreground text-xs">
+                    {formatMetadata(entry.metadata)}
+                  </p>
+                )}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {entry.userName || entry.userId || "System"}
+              </TableCell>
+              <TableCell className="hidden font-mono text-muted-foreground text-xs sm:table-cell">
+                {entry.ip || "-"}
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground text-xs">
+                {new Date(entry.createdAt).toLocaleString()}
+              </TableCell>
+            </TableRow>
+          ))}
+          {data?.data.length === 0 && (
+            <TableRow>
+              <TableCell
+                className="py-8 text-center text-muted-foreground"
+                colSpan={4}
+              >
+                No activity recorded yet.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+      {data && (
+        <TablePagination
+          onPageChange={setPage}
+          page={page}
+          perPage={data.meta.perPage}
+          total={data.meta.total}
+        />
+      )}
+    </>
+  );
+}
+
+function WingsActivityList({ serverId }: { serverId: string }) {
+  const [page, setPage] = useState(0);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["server-wings-activity", serverId, page],
+    queryFn: () =>
+      api.get<WingsActivityResponse>(
+        `/activity/wings/server/${serverId}?page=${page}&per_page=25`
+      ),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <Skeleton className="h-10" key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Event</TableHead>
+            <TableHead className="hidden sm:table-cell">IP</TableHead>
+            <TableHead className="text-right">Time</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data?.data.map((entry) => (
+            <TableRow key={entry.id}>
+              <TableCell>
+                <Badge className="font-mono text-xs" variant="secondary">
+                  {entry.event}
+                </Badge>
+                {formatMetadata(entry.metadata) && (
+                  <p className="mt-1 max-w-xs truncate font-mono text-muted-foreground text-xs">
+                    {formatMetadata(entry.metadata)}
+                  </p>
+                )}
+              </TableCell>
+              <TableCell className="hidden font-mono text-muted-foreground text-xs sm:table-cell">
+                {entry.ip || "-"}
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground text-xs">
+                {new Date(entry.createdAt).toLocaleString()}
+              </TableCell>
+            </TableRow>
+          ))}
+          {data?.data.length === 0 && (
+            <TableRow>
+              <TableCell
+                className="py-8 text-center text-muted-foreground"
+                colSpan={3}
+              >
+                No Wings activity recorded yet.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+      {data && (
+        <TablePagination
+          onPageChange={setPage}
+          page={page}
+          perPage={data.meta.perPage}
+          total={data.meta.total}
+        />
+      )}
+    </>
+  );
+}
+
+export function ActivityTab({ serverId }: { serverId: string }) {
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Activity Log</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton className="h-10" key={i} />
-            ))}
-          </div>
-        ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Event</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead className="hidden sm:table-cell">IP</TableHead>
-                  <TableHead className="text-right">Time</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data?.data.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>
-                      <Badge className="font-mono text-xs" variant="secondary">
-                        {entry.event}
-                      </Badge>
-                      {formatMetadata(entry.metadata) && (
-                        <p className="mt-1 max-w-xs truncate font-mono text-muted-foreground text-xs">
-                          {formatMetadata(entry.metadata)}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {entry.userName || entry.userId || "System"}
-                    </TableCell>
-                    <TableCell className="hidden font-mono text-muted-foreground text-xs sm:table-cell">
-                      {entry.ip || "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground text-xs">
-                      {new Date(entry.createdAt).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {data?.data.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      className="py-8 text-center text-muted-foreground"
-                      colSpan={4}
-                    >
-                      No activity recorded yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            {data && (
-              <TablePagination
-                onPageChange={setPage}
-                page={page}
-                perPage={data.meta.perPage}
-                total={data.meta.total}
-              />
-            )}
-          </>
-        )}
+        <Tabs defaultValue="panel">
+          <TabsList>
+            <TabsTrigger value="panel">Panel</TabsTrigger>
+            <TabsTrigger value="wings">Wings</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="panel">
+            <PanelActivityList serverId={serverId} />
+          </TabsContent>
+
+          <TabsContent value="wings">
+            <WingsActivityList serverId={serverId} />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

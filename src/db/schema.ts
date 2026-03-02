@@ -193,3 +193,26 @@ export const activityLogs = sqliteTable(
     index("idx_activity_created").on(table.createdAt),
   ]
 );
+
+export const wingsActivityLogs = sqliteTable(
+  "wings_activity_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    serverId: text("server_id").references(() => servers.id, {
+      onDelete: "cascade",
+    }),
+    nodeId: integer("node_id").references(() => nodes.id, {
+      onDelete: "set null",
+    }),
+    event: text("event").notNull(),
+    metadata: text("metadata").default("{}"),
+    ip: text("ip").default(""),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    index("idx_wings_activity_server").on(table.serverId),
+    index("idx_wings_activity_node").on(table.nodeId),
+    index("idx_wings_activity_event").on(table.event),
+    index("idx_wings_activity_created").on(table.createdAt),
+  ]
+);
