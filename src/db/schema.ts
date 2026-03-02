@@ -194,6 +194,65 @@ export const activityLogs = sqliteTable(
   ]
 );
 
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    category: text("category").notNull().default("system"), // resource, node, server, system
+    level: text("level").notNull().default("info"), // info, warning, critical
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    metadata: text("metadata").default("{}"),
+    readAt: text("read_at"),
+    ...timestamps,
+  },
+  (table) => [
+    index("idx_notifications_user").on(table.userId),
+    index("idx_notifications_read").on(table.userId, table.readAt),
+    index("idx_notifications_created").on(table.createdAt),
+  ]
+);
+
+export const userAllocations = sqliteTable("user_allocations", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  cpu: integer("cpu").notNull().default(0), // total CPU % allowed (0 = unlimited)
+  memory: integer("memory").notNull().default(0), // total MB allowed (0 = unlimited)
+  disk: integer("disk").notNull().default(0), // total MB allowed (0 = unlimited)
+  servers: integer("servers").notNull().default(0), // max servers (0 = unlimited)
+  databases: integer("databases").notNull().default(0), // max databases (0 = unlimited)
+  backups: integer("backups").notNull().default(0), // max backups (0 = unlimited)
+  allocations: integer("allocations").notNull().default(0), // max extra allocations (0 = unlimited)
+  allowOverprovision: integer("allow_overprovision").notNull().default(0), // 0 = block, 1 = allow with warning
+  ...timestamps,
+});
+
+export const portAllocations = sqliteTable(
+  "port_allocations",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    nodeId: integer("node_id")
+      .notNull()
+      .references(() => nodes.id, { onDelete: "cascade" }),
+    startPort: integer("start_port").notNull(),
+    endPort: integer("end_port").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("idx_port_alloc_user").on(table.userId),
+    index("idx_port_alloc_node").on(table.nodeId),
+  ]
+);
+
 export const wingsActivityLogs = sqliteTable(
   "wings_activity_logs",
   {

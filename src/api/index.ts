@@ -1,9 +1,11 @@
+import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
 import { setupLogger } from "../lib/logger";
 import { generateApiKey } from "../services/api-keys";
 import { activityRoutes } from "./activity";
+import { allocationRoutes } from "./allocations";
 import { applicationRoutes } from "./application";
 import { authRoutes } from "./auth";
 import { eggRoutes } from "./eggs";
@@ -11,6 +13,7 @@ import { fileRoutes } from "./files";
 import { requireAdmin, requireAuth } from "./middleware/auth";
 import { errorHandler, requestLogger } from "./middleware/request-logger";
 import { nodeRoutes } from "./nodes";
+import { notificationRoutes } from "./notifications";
 import { remoteRoutes } from "./remote";
 import { serverRoutes } from "./servers";
 import { subuserRoutes } from "./subusers";
@@ -124,10 +127,12 @@ apiRoutes.route("/servers", serverRoutes);
 apiRoutes.route("/servers", fileRoutes); // mounts /:serverId/files/*
 apiRoutes.route("/servers", subuserRoutes); // mounts /:serverId/subusers/*
 apiRoutes.route("/eggs", eggRoutes);
+apiRoutes.route("/notifications", notificationRoutes);
 apiRoutes.route("/remote", remoteRoutes);
+apiRoutes.route("/allocations", allocationRoutes);
 apiRoutes.route("/application", applicationRoutes);
 
-// Admin: list users (for server creation wizard)
+// Admin: list users (for server creation wizard + admin user management)
 apiRoutes.get("/users", requireAuth, requireAdmin, async (c) => {
   const db = getDb(c.env.DB);
   const users = await db
@@ -136,10 +141,28 @@ apiRoutes.get("/users", requireAuth, requireAdmin, async (c) => {
       email: schema.users.email,
       username: schema.users.username,
       role: schema.users.role,
+      createdAt: schema.users.createdAt,
     })
     .from(schema.users)
     .all();
-  return c.json(users);
+
+  // Fetch server counts per user
+  const serverCounts = await db
+    .select({
+      ownerId: schema.servers.ownerId,
+      count: sql<number>`count(*)`,
+    })
+    .from(schema.servers)
+    .groupBy(schema.servers.ownerId)
+    .all();
+  const countMap = new Map(serverCounts.map((r) => [r.ownerId, r.count]));
+
+  return c.json(
+    users.map((u) => ({
+      ...u,
+      serverCount: countMap.get(u.id) ?? 0,
+    }))
+  );
 });
 
 // POST /api/api-keys — create an application API key (admin only)
