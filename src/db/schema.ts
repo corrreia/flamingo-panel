@@ -90,6 +90,7 @@ export const servers = sqliteTable(
       .notNull()
       .default(25_565),
     additionalAllocations: text("additional_allocations").default("[]"),
+    backupLimit: integer("backup_limit").notNull().default(3),
     status: text("status"),
     containerStatus: text("container_status").default("offline"),
     installedAt: text("installed_at"),
@@ -98,6 +99,33 @@ export const servers = sqliteTable(
   (table) => [
     index("idx_servers_node").on(table.nodeId),
     index("idx_servers_owner").on(table.ownerId),
+  ]
+);
+
+export const backups = sqliteTable(
+  "backups",
+  {
+    id: id(),
+    serverId: text("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    uuid: text("uuid")
+      .notNull()
+      .unique()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    isSuccessful: integer("is_successful").notNull().default(0),
+    isLocked: integer("is_locked").notNull().default(0),
+    ignoredFiles: text("ignored_files").default("[]"),
+    checksum: text("checksum"),
+    bytes: integer("bytes").notNull().default(0),
+    uploadId: text("upload_id"),
+    completedAt: text("completed_at"),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    index("idx_backups_server").on(table.serverId),
+    uniqueIndex("idx_backups_uuid").on(table.uuid),
   ]
 );
 

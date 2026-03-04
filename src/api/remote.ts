@@ -2,6 +2,14 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { getDb, schema } from "../db";
 import {
+  abortMultipartUpload,
+  backupKey,
+  completeMultipartUpload,
+  createMultipartUpload,
+  getPresignedUploadUrls,
+  getS3Client,
+} from "../lib/r2";
+import {
   buildBootConfig,
   buildServerEnvironment,
 } from "../services/wings-payload";
@@ -305,13 +313,152 @@ remoteRoutes.post("/activity", async (c) => {
   return c.body(null, 204);
 });
 
-// POST /api/remote/backups/:uuid - Wings reports backup status
-remoteRoutes.post("/backups/:uuid", (c) => {
+// GET /api/remote/backups/:uuid — Wings requests presigned upload URLs for multipart
+remoteRoutes.get("/backups/:uuid", async (c) => {
+  const node = c.get("node");
+  const db = getDb(c.env.DB);
+  const size = Number(c.req.query("size") || "0");
+
+  const backup = await db
+    .select()
+    .from(schema.backups)
+    .where(eq(schema.backups.uuid, c.req.param("uuid")))
+    .get();
+  if (!backup) {
+    return c.json({ error: "Backup not found" }, 404);
+  }
+
+  // Verify the backup belongs to a server on this node
+  const server = await db
+    .select()
+    .from(schema.servers)
+    .where(
+      and(
+        eq(schema.servers.id, backup.serverId),
+        eq(schema.servers.nodeId, node.id)
+      )
+    )
+    .get();
+  if (!server) {
+    return c.json({ error: "Server not found on this node" }, 404);
+  }
+
+  const s3 = getS3Client(c.env);
+  const key = backupKey(server.uuid, backup.uuid);
+  const uploadId = await createMultipartUpload(s3, key);
+
+  // Store uploadId on the backup row
+  await db
+    .update(schema.backups)
+    .set({ uploadId })
+    .where(eq(schema.backups.id, backup.id));
+
+  const result = await getPresignedUploadUrls(s3, key, uploadId, size);
+  return c.json(result);
+});
+
+// POST /api/remote/backups/:uuid — Wings reports backup completion
+remoteRoutes.post("/backups/:uuid", async (c) => {
+  const node = c.get("node");
+  const db = getDb(c.env.DB);
+  const body = (await c.req.json()) as {
+    successful: boolean;
+    checksum: string;
+    checksum_type: string;
+    size: number;
+    parts: Array<{ etag: string; part_number: number }>;
+  };
+
+  const backup = await db
+    .select()
+    .from(schema.backups)
+    .where(eq(schema.backups.uuid, c.req.param("uuid")))
+    .get();
+  if (!backup) {
+    return c.json({ error: "Backup not found" }, 404);
+  }
+
+  const server = await db
+    .select()
+    .from(schema.servers)
+    .where(
+      and(
+        eq(schema.servers.id, backup.serverId),
+        eq(schema.servers.nodeId, node.id)
+      )
+    )
+    .get();
+  if (!server) {
+    return c.json({ error: "Server not found on this node" }, 404);
+  }
+
+  const s3 = getS3Client(c.env);
+  const key = backupKey(server.uuid, backup.uuid);
+
+  if (body.successful && backup.uploadId) {
+    await completeMultipartUpload(s3, key, backup.uploadId, body.parts);
+  } else if (!body.successful && backup.uploadId) {
+    try {
+      await abortMultipartUpload(s3, key, backup.uploadId);
+    } catch {
+      // Abort may fail if upload never started
+    }
+  }
+
+  const checksumValue = body.checksum
+    ? `${body.checksum_type || "sha1"}:${body.checksum}`
+    : null;
+
+  await db
+    .update(schema.backups)
+    .set({
+      isSuccessful: body.successful ? 1 : 0,
+      isLocked: body.successful ? backup.isLocked : 0,
+      checksum: checksumValue,
+      bytes: body.size || 0,
+      completedAt: new Date().toISOString(),
+    })
+    .where(eq(schema.backups.id, backup.id));
+
   return c.body(null, 204);
 });
 
-// POST /api/remote/backups/:uuid/restore - Wings reports restore status
-remoteRoutes.post("/backups/:uuid/restore", (c) => {
+// POST /api/remote/backups/:uuid/restore — Wings reports restore completion
+remoteRoutes.post("/backups/:uuid/restore", async (c) => {
+  const node = c.get("node");
+  const db = getDb(c.env.DB);
+  // Consume request body (Wings sends successful status)
+  await c.req.json();
+
+  const backup = await db
+    .select()
+    .from(schema.backups)
+    .where(eq(schema.backups.uuid, c.req.param("uuid")))
+    .get();
+  if (!backup) {
+    return c.json({ error: "Backup not found" }, 404);
+  }
+
+  const server = await db
+    .select()
+    .from(schema.servers)
+    .where(
+      and(
+        eq(schema.servers.id, backup.serverId),
+        eq(schema.servers.nodeId, node.id)
+      )
+    )
+    .get();
+  if (!server) {
+    return c.json({ error: "Server not found on this node" }, 404);
+  }
+
+  // Clear the restoring state
+  await db
+    .update(schema.servers)
+    .set({ status: null, updatedAt: new Date().toISOString() })
+    .where(eq(schema.servers.id, server.id));
+
   return c.body(null, 204);
 });
 

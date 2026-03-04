@@ -6,6 +6,7 @@ import { generateApiKey } from "../services/api-keys";
 import { activityRoutes } from "./activity";
 import { applicationRoutes } from "./application";
 import { authRoutes } from "./auth";
+import { backupRoutes } from "./backups";
 import { eggRoutes } from "./eggs";
 import { fileRoutes } from "./files";
 import { requireAdmin, requireAuth } from "./middleware/auth";
@@ -123,6 +124,7 @@ apiRoutes.route("/nodes", nodeRoutes);
 apiRoutes.route("/servers", serverRoutes);
 apiRoutes.route("/servers", fileRoutes); // mounts /:serverId/files/*
 apiRoutes.route("/servers", subuserRoutes); // mounts /:serverId/subusers/*
+apiRoutes.route("/servers", backupRoutes); // mounts /:serverId/backups/*
 apiRoutes.route("/eggs", eggRoutes);
 apiRoutes.route("/remote", remoteRoutes);
 apiRoutes.route("/application", applicationRoutes);
