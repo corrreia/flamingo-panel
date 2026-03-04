@@ -123,10 +123,7 @@ export const backups = sqliteTable(
     completedAt: text("completed_at"),
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   },
-  (table) => [
-    index("idx_backups_server").on(table.serverId),
-    uniqueIndex("idx_backups_uuid").on(table.uuid),
-  ]
+  (table) => [index("idx_backups_server").on(table.serverId)]
 );
 
 export const eggVariables = sqliteTable(

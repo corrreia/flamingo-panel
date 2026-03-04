@@ -1,5 +1,7 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { zValidator } from "@hono/zod-validator";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { z } from "zod";
 import { getDb, schema } from "../db";
 import {
   abortMultipartUpload,
@@ -7,7 +9,7 @@ import {
   completeMultipartUpload,
   createMultipartUpload,
   getPresignedUploadUrls,
-  getS3Client,
+  getR2Client,
 } from "../lib/r2";
 import {
   buildBootConfig,
@@ -313,154 +315,208 @@ remoteRoutes.post("/activity", async (c) => {
   return c.body(null, 204);
 });
 
+// Max upload size: 50 GB
+const MAX_UPLOAD_SIZE = 50 * 1024 * 1024 * 1024;
+
 // GET /api/remote/backups/:uuid — Wings requests presigned upload URLs for multipart
-remoteRoutes.get("/backups/:uuid", async (c) => {
-  const node = c.get("node");
-  const db = getDb(c.env.DB);
-  const size = Number(c.req.query("size") || "0");
+remoteRoutes.get(
+  "/backups/:uuid",
+  zValidator(
+    "query",
+    z.object({
+      size: z.coerce.number().int().min(1).max(MAX_UPLOAD_SIZE),
+    })
+  ),
+  async (c) => {
+    const node = c.get("node");
+    const db = getDb(c.env.DB);
+    const { size } = c.req.valid("query");
 
-  const backup = await db
-    .select()
-    .from(schema.backups)
-    .where(eq(schema.backups.uuid, c.req.param("uuid")))
-    .get();
-  if (!backup) {
-    return c.json({ error: "Backup not found" }, 404);
-  }
+    const backup = await db
+      .select()
+      .from(schema.backups)
+      .where(eq(schema.backups.uuid, c.req.param("uuid")))
+      .get();
+    if (!backup) {
+      return c.json({ error: "Backup not found" }, 404);
+    }
 
-  // Verify the backup belongs to a server on this node
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(
-      and(
-        eq(schema.servers.id, backup.serverId),
-        eq(schema.servers.nodeId, node.id)
+    // Verify the backup belongs to a server on this node
+    const server = await db
+      .select()
+      .from(schema.servers)
+      .where(
+        and(
+          eq(schema.servers.id, backup.serverId),
+          eq(schema.servers.nodeId, node.id)
+        )
       )
-    )
-    .get();
-  if (!server) {
-    return c.json({ error: "Server not found on this node" }, 404);
+      .get();
+    if (!server) {
+      return c.json({ error: "Server not found on this node" }, 404);
+    }
+
+    const r2 = getR2Client(c.env);
+    const key = backupKey(server.uuid, backup.uuid);
+
+    // Reuse existing uploadId if present, otherwise create new
+    let uploadId = backup.uploadId;
+    if (!uploadId) {
+      uploadId = await createMultipartUpload(r2, key);
+      // Conditionally store uploadId (only if not set by a concurrent request)
+      const result = await db
+        .update(schema.backups)
+        .set({ uploadId })
+        .where(
+          and(eq(schema.backups.id, backup.id), isNull(schema.backups.uploadId))
+        );
+      // If no rows updated, another request set the uploadId — reload it
+      if (result.rowsAffected === 0) {
+        const refreshed = await db
+          .select({ uploadId: schema.backups.uploadId })
+          .from(schema.backups)
+          .where(eq(schema.backups.id, backup.id))
+          .get();
+        if (refreshed?.uploadId) {
+          uploadId = refreshed.uploadId;
+        }
+      }
+    }
+
+    const urls = await getPresignedUploadUrls(r2, key, uploadId, size);
+    return c.json(urls);
   }
-
-  const s3 = getS3Client(c.env);
-  const key = backupKey(server.uuid, backup.uuid);
-  const uploadId = await createMultipartUpload(s3, key);
-
-  // Store uploadId on the backup row
-  await db
-    .update(schema.backups)
-    .set({ uploadId })
-    .where(eq(schema.backups.id, backup.id));
-
-  const result = await getPresignedUploadUrls(s3, key, uploadId, size);
-  return c.json(result);
-});
+);
 
 // POST /api/remote/backups/:uuid — Wings reports backup completion
-remoteRoutes.post("/backups/:uuid", async (c) => {
-  const node = c.get("node");
-  const db = getDb(c.env.DB);
-  const body = (await c.req.json()) as {
-    successful: boolean;
-    checksum: string;
-    checksum_type: string;
-    size: number;
-    parts: Array<{ etag: string; part_number: number }>;
-  };
-
-  const backup = await db
-    .select()
-    .from(schema.backups)
-    .where(eq(schema.backups.uuid, c.req.param("uuid")))
-    .get();
-  if (!backup) {
-    return c.json({ error: "Backup not found" }, 404);
-  }
-
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(
-      and(
-        eq(schema.servers.id, backup.serverId),
-        eq(schema.servers.nodeId, node.id)
-      )
-    )
-    .get();
-  if (!server) {
-    return c.json({ error: "Server not found on this node" }, 404);
-  }
-
-  const s3 = getS3Client(c.env);
-  const key = backupKey(server.uuid, backup.uuid);
-
-  if (body.successful && backup.uploadId) {
-    await completeMultipartUpload(s3, key, backup.uploadId, body.parts);
-  } else if (!body.successful && backup.uploadId) {
-    try {
-      await abortMultipartUpload(s3, key, backup.uploadId);
-    } catch {
-      // Abort may fail if upload never started
-    }
-  }
-
-  const checksumValue = body.checksum
-    ? `${body.checksum_type || "sha1"}:${body.checksum}`
-    : null;
-
-  await db
-    .update(schema.backups)
-    .set({
-      isSuccessful: body.successful ? 1 : 0,
-      isLocked: body.successful ? backup.isLocked : 0,
-      checksum: checksumValue,
-      bytes: body.size || 0,
-      completedAt: new Date().toISOString(),
+remoteRoutes.post(
+  "/backups/:uuid",
+  zValidator(
+    "json",
+    z.object({
+      successful: z.boolean(),
+      checksum: z.string().optional().default(""),
+      checksum_type: z.string().optional().default("sha1"),
+      size: z.number().int().min(0),
+      parts: z.array(
+        z.object({
+          etag: z.string(),
+          part_number: z.number().int().min(1),
+        })
+      ),
     })
-    .where(eq(schema.backups.id, backup.id));
+  ),
+  async (c) => {
+    const node = c.get("node");
+    const db = getDb(c.env.DB);
+    const body = c.req.valid("json");
 
-  return c.body(null, 204);
-});
+    const backup = await db
+      .select()
+      .from(schema.backups)
+      .where(eq(schema.backups.uuid, c.req.param("uuid")))
+      .get();
+    if (!backup) {
+      return c.json({ error: "Backup not found" }, 404);
+    }
+
+    const server = await db
+      .select()
+      .from(schema.servers)
+      .where(
+        and(
+          eq(schema.servers.id, backup.serverId),
+          eq(schema.servers.nodeId, node.id)
+        )
+      )
+      .get();
+    if (!server) {
+      return c.json({ error: "Server not found on this node" }, 404);
+    }
+
+    const r2 = getR2Client(c.env);
+    const key = backupKey(server.uuid, backup.uuid);
+
+    if (body.successful && backup.uploadId) {
+      await completeMultipartUpload(r2, key, backup.uploadId, body.parts);
+    } else if (!body.successful && backup.uploadId) {
+      try {
+        await abortMultipartUpload(r2, key, backup.uploadId);
+      } catch {
+        // Abort may fail if upload never started
+      }
+    }
+
+    const checksumValue = body.checksum
+      ? `${body.checksum_type}:${body.checksum}`
+      : null;
+
+    // Clear uploadId after completion/abort to avoid stale references
+    await db
+      .update(schema.backups)
+      .set({
+        isSuccessful: body.successful ? 1 : 0,
+        isLocked: body.successful ? backup.isLocked : 0,
+        checksum: checksumValue,
+        bytes: body.size || 0,
+        uploadId: null,
+        completedAt: new Date().toISOString(),
+      })
+      .where(eq(schema.backups.id, backup.id));
+
+    return c.body(null, 204);
+  }
+);
 
 // POST /api/remote/backups/:uuid/restore — Wings reports restore completion
-remoteRoutes.post("/backups/:uuid/restore", async (c) => {
-  const node = c.get("node");
-  const db = getDb(c.env.DB);
-  // Consume request body (Wings sends successful status)
-  await c.req.json();
+remoteRoutes.post(
+  "/backups/:uuid/restore",
+  zValidator(
+    "json",
+    z.object({
+      successful: z.boolean(),
+    })
+  ),
+  async (c) => {
+    const node = c.get("node");
+    const db = getDb(c.env.DB);
+    const { successful } = c.req.valid("json");
 
-  const backup = await db
-    .select()
-    .from(schema.backups)
-    .where(eq(schema.backups.uuid, c.req.param("uuid")))
-    .get();
-  if (!backup) {
-    return c.json({ error: "Backup not found" }, 404);
-  }
+    const backup = await db
+      .select()
+      .from(schema.backups)
+      .where(eq(schema.backups.uuid, c.req.param("uuid")))
+      .get();
+    if (!backup) {
+      return c.json({ error: "Backup not found" }, 404);
+    }
 
-  const server = await db
-    .select()
-    .from(schema.servers)
-    .where(
-      and(
-        eq(schema.servers.id, backup.serverId),
-        eq(schema.servers.nodeId, node.id)
+    const server = await db
+      .select()
+      .from(schema.servers)
+      .where(
+        and(
+          eq(schema.servers.id, backup.serverId),
+          eq(schema.servers.nodeId, node.id)
+        )
       )
-    )
-    .get();
-  if (!server) {
-    return c.json({ error: "Server not found on this node" }, 404);
+      .get();
+    if (!server) {
+      return c.json({ error: "Server not found on this node" }, 404);
+    }
+
+    // Only clear restoring state on success; set error state on failure
+    await db
+      .update(schema.servers)
+      .set({
+        status: successful ? null : "restore_failed",
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(schema.servers.id, server.id));
+
+    return c.body(null, 204);
   }
-
-  // Clear the restoring state
-  await db
-    .update(schema.servers)
-    .set({ status: null, updatedAt: new Date().toISOString() })
-    .where(eq(schema.servers.id, server.id));
-
-  return c.body(null, 204);
-});
+);
 
 // POST /api/remote/sftp/auth - Wings validates SFTP credentials
 remoteRoutes.post("/sftp/auth", async (c) => {

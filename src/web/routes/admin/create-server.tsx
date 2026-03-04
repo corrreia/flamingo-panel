@@ -184,7 +184,7 @@ function CreateServerPage() {
         cpu: resolvedCpu,
         disk: resolvedDisk,
         defaultAllocationPort: Number.parseInt(port, 10),
-        backupLimit: Number.parseInt(backupLimit, 10),
+        backupLimit: Math.max(0, Number.parseInt(backupLimit, 10) || 0),
         image: selectedImage || undefined,
         variables,
       }),
