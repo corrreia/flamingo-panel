@@ -22,7 +22,9 @@
   },
   "vars": {
     "PANEL_URL": "https://flamingo.tomascorreia.net",
-    "OIDC_DISCOVERY_URL": "https://auth.tomascorreia.net/.well-known/openid-configuration"
+    "OIDC_DISCOVERY_URL": "https://auth.tomascorreia.net/.well-known/openid-configuration",
+    "CF_ACCOUNT_ID": "YOUR_ACCOUNT_ID",
+    "R2_BUCKET_NAME": "flamingo-r2"
   },
   "d1_databases": [
     {

@@ -18,17 +18,19 @@ const REQUIRED_ENV = [
   "R2_SECRET_ACCESS_KEY",
 ] as const;
 
+let missingEnv: string[] | null = null;
 let envChecked = false;
 
 function checkEnv(): string[] | null {
   if (envChecked) {
-    return null;
+    return missingEnv;
   }
   envChecked = true;
   const missing = REQUIRED_ENV.filter(
     (key) => !(env as Record<string, unknown>)[key]
   );
-  return missing.length > 0 ? missing : null;
+  missingEnv = missing.length > 0 ? missing : null;
+  return missingEnv;
 }
 
 // Hono API app — handles /api/* routes
