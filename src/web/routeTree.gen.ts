@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as EggsRouteImport } from './routes/eggs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServerServerIdRouteImport } from './routes/server/$serverId'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminCreateServerRouteImport } from './routes/admin/create-server'
 import { Route as AdminActivityRouteImport } from './routes/admin/activity'
 import { Route as AdminNodesIndexRouteImport } from './routes/admin/nodes/index'
@@ -39,6 +40,11 @@ const IndexRoute = IndexRouteImport.update({
 const ServerServerIdRoute = ServerServerIdRouteImport.update({
   id: '/server/$serverId',
   path: '/server/$serverId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminCreateServerRoute = AdminCreateServerRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
+  '/admin/users': typeof AdminUsersRoute
   '/server/$serverId': typeof ServerServerIdRoute
   '/admin/eggs/$eggId': typeof AdminEggsEggIdRoute
   '/admin/eggs/create': typeof AdminEggsCreateRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
+  '/admin/users': typeof AdminUsersRoute
   '/server/$serverId': typeof ServerServerIdRoute
   '/admin/eggs/$eggId': typeof AdminEggsEggIdRoute
   '/admin/eggs/create': typeof AdminEggsCreateRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/create-server': typeof AdminCreateServerRoute
+  '/admin/users': typeof AdminUsersRoute
   '/server/$serverId': typeof ServerServerIdRoute
   '/admin/eggs/$eggId': typeof AdminEggsEggIdRoute
   '/admin/eggs/create': typeof AdminEggsCreateRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/activity'
     | '/admin/create-server'
+    | '/admin/users'
     | '/server/$serverId'
     | '/admin/eggs/$eggId'
     | '/admin/eggs/create'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/activity'
     | '/admin/create-server'
+    | '/admin/users'
     | '/server/$serverId'
     | '/admin/eggs/$eggId'
     | '/admin/eggs/create'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/activity'
     | '/admin/create-server'
+    | '/admin/users'
     | '/server/$serverId'
     | '/admin/eggs/$eggId'
     | '/admin/eggs/create'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   AdminActivityRoute: typeof AdminActivityRoute
   AdminCreateServerRoute: typeof AdminCreateServerRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   ServerServerIdRoute: typeof ServerServerIdRoute
   AdminEggsEggIdRoute: typeof AdminEggsEggIdRoute
   AdminEggsCreateRoute: typeof AdminEggsCreateRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/server/$serverId'
       fullPath: '/server/$serverId'
       preLoaderRoute: typeof ServerServerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/create-server': {
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   AdminActivityRoute: AdminActivityRoute,
   AdminCreateServerRoute: AdminCreateServerRoute,
+  AdminUsersRoute: AdminUsersRoute,
   ServerServerIdRoute: ServerServerIdRoute,
   AdminEggsEggIdRoute: AdminEggsEggIdRoute,
   AdminEggsCreateRoute: AdminEggsCreateRoute,

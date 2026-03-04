@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
@@ -89,76 +89,58 @@ backupRoutes.post(
           .filter(Boolean)
       : [];
 
-    // Use a transaction to atomically enforce the backup limit
-    const backup = await db.transaction(async (tx) => {
-      // Count non-failed backups (in-progress or successful)
-      const existing = await tx
-        .select()
-        .from(schema.backups)
-        .where(
-          and(
-            eq(schema.backups.serverId, server.id),
-            or(
-              isNull(schema.backups.completedAt),
-              eq(schema.backups.isSuccessful, 1)
-            )
+    // Enforce the backup limit (D1 doesn't support SQL transactions)
+    const existing = await db
+      .select()
+      .from(schema.backups)
+      .where(
+        and(
+          eq(schema.backups.serverId, server.id),
+          or(
+            isNull(schema.backups.completedAt),
+            eq(schema.backups.isSuccessful, 1)
           )
         )
-        .all();
+      )
+      .all();
 
-      if (existing.length >= server.backupLimit) {
-        // Try to delete the oldest unlocked completed backup
-        const oldest = existing
-          .filter((b) => !b.isLocked && b.completedAt !== null)
-          .sort(
-            (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          )[0];
+    if (existing.length >= server.backupLimit) {
+      // Try to delete the oldest unlocked completed backup
+      const oldest = existing
+        .filter((b) => !b.isLocked && b.completedAt !== null)
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )[0];
 
-        if (!oldest) {
-          throw new Error(
-            "Backup limit reached and all existing backups are locked or in progress"
-          );
-        }
-
-        // Delete from R2 (best-effort, outside transaction scope)
-        try {
-          await c.env.R2.delete(backupKey(server.uuid, oldest.uuid));
-        } catch {
-          // R2 object may not exist (failed backup)
-        }
-        await tx.delete(schema.backups).where(eq(schema.backups.id, oldest.id));
+      if (!oldest) {
+        return c.json(
+          {
+            error:
+              "Backup limit reached and all existing backups are locked or in progress",
+          },
+          409
+        );
       }
 
-      // Re-check count after potential deletion
-      const recount = await tx
-        .select({ count: sql<number>`count(*)` })
-        .from(schema.backups)
-        .where(
-          and(
-            eq(schema.backups.serverId, server.id),
-            or(
-              isNull(schema.backups.completedAt),
-              eq(schema.backups.isSuccessful, 1)
-            )
-          )
-        )
-        .get();
-
-      if ((recount?.count ?? 0) >= server.backupLimit) {
-        throw new Error("Backup limit reached");
+      // Delete from R2 (best-effort)
+      try {
+        await c.env.R2.delete(backupKey(server.uuid, oldest.uuid));
+      } catch {
+        // R2 object may not exist (failed backup)
       }
+      await db.delete(schema.backups).where(eq(schema.backups.id, oldest.id));
+    }
 
-      return tx
-        .insert(schema.backups)
-        .values({
-          serverId: server.id,
-          name: data.name,
-          ignoredFiles: JSON.stringify(ignoredArray),
-        })
-        .returning()
-        .get();
-    });
+    const backup = await db
+      .insert(schema.backups)
+      .values({
+        serverId: server.id,
+        name: data.name,
+        ignoredFiles: JSON.stringify(ignoredArray),
+      })
+      .returning()
+      .get();
 
     // Tell Wings to create the backup
     const node = await db
