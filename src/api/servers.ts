@@ -48,6 +48,7 @@ serverRoutes.post(
         .min(1)
         .max(65_535)
         .default(25_565),
+      backupLimit: z.number().int().min(0).default(3),
       startup: z.string().optional(),
       image: z.string().optional(),
       variables: z.record(z.string(), z.string()).optional(),
@@ -184,6 +185,7 @@ serverRoutes.post(
           swap: data.swap,
           io: data.io,
           defaultAllocationPort: data.defaultAllocationPort,
+          backupLimit: data.backupLimit,
           startup: data.startup || egg.startup,
           image: data.image || egg.dockerImage,
           status: "installing",

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Layout } from "@web/components/layout";
 import { PageHeader } from "@web/components/page-header";
 import { ActivityTab } from "@web/components/server/activity-tab";
+import { BackupsTab } from "@web/components/server/backups-tab";
 import { ConsoleTab } from "@web/components/server/console-tab";
 import { FilesTab } from "@web/components/server/files-tab";
 import { PowerControls } from "@web/components/server/power-controls";
@@ -35,6 +36,7 @@ import {
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
 import {
+  Archive,
   ClipboardList,
   Cpu,
   FolderOpen,
@@ -98,6 +100,14 @@ function getStatusLabel(s: ServerDetail): string {
   return s.containerStatus || s.resources?.state || "offline";
 }
 
+/**
+ * Displays the server page for the current route's serverId, including header, resource stats, and tabbed views.
+ *
+ * Renders a loading skeleton while server data is being fetched and shows a "Server not found." message if no server is returned.
+ * When data is available, presents a page header with power controls and status, an optional utilization strip, and tabs for Console, Files, Backups, Activity, and—when the user has permission—Settings and Users.
+ *
+ * @returns The JSX element representing the server details page for the route's `serverId`
+ */
 function ServerPage() {
   const { serverId } = Route.useParams();
 
@@ -179,6 +189,9 @@ function ServerPage() {
             <TabsTrigger value="files">
               <FolderOpen className="mr-2 h-4 w-4" /> Files
             </TabsTrigger>
+            <TabsTrigger value="backups">
+              <Archive className="mr-2 h-4 w-4" /> Backups
+            </TabsTrigger>
             {canManage && (
               <TabsTrigger value="settings">
                 <Settings className="mr-2 h-4 w-4" /> Settings
@@ -198,6 +211,9 @@ function ServerPage() {
           </TabsContent>
           <TabsContent value="files">
             <FilesTab serverId={server.id} />
+          </TabsContent>
+          <TabsContent value="backups">
+            <BackupsTab serverId={server.id} />
           </TabsContent>
           {canManage && (
             <TabsContent value="settings">
