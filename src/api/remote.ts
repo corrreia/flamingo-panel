@@ -363,23 +363,38 @@ remoteRoutes.get(
     let uploadId = backup.uploadId;
     if (!uploadId) {
       uploadId = await createMultipartUpload(r2, key);
-      // Conditionally store uploadId (only if not set by a concurrent request)
-      const result = await db
-        .update(schema.backups)
-        .set({ uploadId })
-        .where(
-          and(eq(schema.backups.id, backup.id), isNull(schema.backups.uploadId))
-        );
-      // If no rows updated, another request set the uploadId — reload it
-      if (result.rowsAffected === 0) {
-        const refreshed = await db
-          .select({ uploadId: schema.backups.uploadId })
-          .from(schema.backups)
-          .where(eq(schema.backups.id, backup.id))
-          .get();
-        if (refreshed?.uploadId) {
-          uploadId = refreshed.uploadId;
+      try {
+        // Conditionally store uploadId (only if not set by a concurrent request)
+        const result = await db
+          .update(schema.backups)
+          .set({ uploadId })
+          .where(
+            and(
+              eq(schema.backups.id, backup.id),
+              isNull(schema.backups.uploadId)
+            )
+          );
+        // If no rows updated, another request set the uploadId — reload it
+        if (result.meta.changes === 0) {
+          await abortMultipartUpload(r2, key, uploadId);
+          const refreshed = await db
+            .select({ uploadId: schema.backups.uploadId })
+            .from(schema.backups)
+            .where(eq(schema.backups.id, backup.id))
+            .get();
+          if (refreshed?.uploadId) {
+            uploadId = refreshed.uploadId;
+          }
         }
+      } catch (err) {
+        // Clean up the R2 multipart upload we just created
+        try {
+          await abortMultipartUpload(r2, key, uploadId);
+        } catch (_abortErr) {
+          // Log but don't swallow the original error
+          console.error("Failed to abort multipart upload after DB error");
+        }
+        throw err;
       }
     }
 

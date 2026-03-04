@@ -72,7 +72,7 @@ export async function createMultipartUpload(
  * @param key - Object key (path) in the bucket.
  * @param uploadId - Multipart upload session identifier.
  * @param size - Total size of the object to be uploaded, in bytes.
- * @returns An object with `parts`: an array of presigned upload URLs ordered by part number, and `part_size`: the byte size used for each part. 
+ * @returns An object with `parts`: an array of presigned upload URLs ordered by part number, and `part_size`: the byte size used for each part.
  */
 export async function getPresignedUploadUrls(
   r2: R2Client,
