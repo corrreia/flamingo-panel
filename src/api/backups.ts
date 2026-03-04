@@ -1,10 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, schema } from "../db";
 import { logActivity } from "../lib/activity";
-import { backupKey, getPresignedDownloadUrl, getS3Client } from "../lib/r2";
+import { backupKey, getPresignedDownloadUrl, getR2Client } from "../lib/r2";
 import { getServerAccess } from "../lib/server-access";
 import { WingsClient } from "../lib/wings-client";
 import { type AuthUser, requireAuth } from "./middleware/auth";
@@ -16,31 +16,46 @@ export const backupRoutes = new Hono<{
 
 backupRoutes.use("*", requireAuth);
 
-// GET /api/servers/:serverId/backups — list backups for a server
-backupRoutes.get("/:serverId/backups", async (c) => {
-  const user = c.get("user");
-  const db = getDb(c.env.DB);
-
-  const access = await getServerAccess(db, c.req.param("serverId"), user);
-  if (!access) {
-    return c.json({ error: "Server not found" }, 404);
-  }
-
-  const list = await db
-    .select()
-    .from(schema.backups)
-    .where(eq(schema.backups.serverId, access.server.id))
-    .all();
-
-  return c.json({
-    backups: list,
-    backupLimit: access.server.backupLimit,
-  });
+const serverIdParam = z.object({ serverId: z.string().min(1) });
+const backupIdParam = z.object({
+  serverId: z.string().min(1),
+  backupId: z.string().min(1),
 });
+
+// GET /api/servers/:serverId/backups — list backups for a server
+backupRoutes.get(
+  "/:serverId/backups",
+  zValidator("param", serverIdParam),
+  async (c) => {
+    const user = c.get("user");
+    const db = getDb(c.env.DB);
+
+    const access = await getServerAccess(
+      db,
+      c.req.valid("param").serverId,
+      user
+    );
+    if (!access) {
+      return c.json({ error: "Server not found" }, 404);
+    }
+
+    const list = await db
+      .select()
+      .from(schema.backups)
+      .where(eq(schema.backups.serverId, access.server.id))
+      .all();
+
+    return c.json({
+      backups: list,
+      backupLimit: access.server.backupLimit,
+    });
+  }
+);
 
 // POST /api/servers/:serverId/backups — create a backup
 backupRoutes.post(
   "/:serverId/backups",
+  zValidator("param", serverIdParam),
   zValidator(
     "json",
     z.object({
@@ -53,7 +68,11 @@ backupRoutes.post(
     const db = getDb(c.env.DB);
     const data = c.req.valid("json");
 
-    const access = await getServerAccess(db, c.req.param("serverId"), user);
+    const access = await getServerAccess(
+      db,
+      c.req.valid("param").serverId,
+      user
+    );
     if (!access) {
       return c.json({ error: "Server not found" }, 404);
     }
@@ -63,49 +82,6 @@ backupRoutes.post(
       return c.json({ error: "Backups are disabled for this server" }, 403);
     }
 
-    // Count non-failed backups (in-progress or successful)
-    const existing = await db
-      .select()
-      .from(schema.backups)
-      .where(
-        and(
-          eq(schema.backups.serverId, server.id),
-          or(
-            sql`${schema.backups.completedAt} IS NULL`,
-            eq(schema.backups.isSuccessful, 1)
-          )
-        )
-      )
-      .all();
-
-    if (existing.length >= server.backupLimit) {
-      // Try to delete the oldest unlocked non-failed backup
-      const oldest = existing
-        .filter((b) => !b.isLocked && b.completedAt !== null)
-        .sort(
-          (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        )[0];
-
-      if (!oldest) {
-        return c.json(
-          {
-            error:
-              "Backup limit reached and all existing backups are locked or in progress",
-          },
-          400
-        );
-      }
-
-      // Delete oldest backup from R2 + DB
-      try {
-        await c.env.R2.delete(backupKey(server.uuid, oldest.uuid));
-      } catch {
-        // R2 object may not exist (failed backup)
-      }
-      await db.delete(schema.backups).where(eq(schema.backups.id, oldest.id));
-    }
-
     const ignoredArray = data.ignored
       ? data.ignored
           .split("\n")
@@ -113,15 +89,76 @@ backupRoutes.post(
           .filter(Boolean)
       : [];
 
-    const backup = await db
-      .insert(schema.backups)
-      .values({
-        serverId: server.id,
-        name: data.name,
-        ignoredFiles: JSON.stringify(ignoredArray),
-      })
-      .returning()
-      .get();
+    // Use a transaction to atomically enforce the backup limit
+    const backup = await db.transaction(async (tx) => {
+      // Count non-failed backups (in-progress or successful)
+      const existing = await tx
+        .select()
+        .from(schema.backups)
+        .where(
+          and(
+            eq(schema.backups.serverId, server.id),
+            or(
+              isNull(schema.backups.completedAt),
+              eq(schema.backups.isSuccessful, 1)
+            )
+          )
+        )
+        .all();
+
+      if (existing.length >= server.backupLimit) {
+        // Try to delete the oldest unlocked completed backup
+        const oldest = existing
+          .filter((b) => !b.isLocked && b.completedAt !== null)
+          .sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          )[0];
+
+        if (!oldest) {
+          throw new Error(
+            "Backup limit reached and all existing backups are locked or in progress"
+          );
+        }
+
+        // Delete from R2 (best-effort, outside transaction scope)
+        try {
+          await c.env.R2.delete(backupKey(server.uuid, oldest.uuid));
+        } catch {
+          // R2 object may not exist (failed backup)
+        }
+        await tx.delete(schema.backups).where(eq(schema.backups.id, oldest.id));
+      }
+
+      // Re-check count after potential deletion
+      const recount = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.backups)
+        .where(
+          and(
+            eq(schema.backups.serverId, server.id),
+            or(
+              isNull(schema.backups.completedAt),
+              eq(schema.backups.isSuccessful, 1)
+            )
+          )
+        )
+        .get();
+
+      if ((recount?.count ?? 0) >= server.backupLimit) {
+        throw new Error("Backup limit reached");
+      }
+
+      return tx
+        .insert(schema.backups)
+        .values({
+          serverId: server.id,
+          name: data.name,
+          ignoredFiles: JSON.stringify(ignoredArray),
+        })
+        .returning()
+        .get();
+    });
 
     // Tell Wings to create the backup
     const node = await db
@@ -163,91 +200,102 @@ backupRoutes.post(
 );
 
 // GET /api/servers/:serverId/backups/:backupId/download — presigned download URL
-backupRoutes.get("/:serverId/backups/:backupId/download", async (c) => {
-  const user = c.get("user");
-  const db = getDb(c.env.DB);
+backupRoutes.get(
+  "/:serverId/backups/:backupId/download",
+  zValidator("param", backupIdParam),
+  async (c) => {
+    const user = c.get("user");
+    const db = getDb(c.env.DB);
+    const params = c.req.valid("param");
 
-  const access = await getServerAccess(db, c.req.param("serverId"), user);
-  if (!access) {
-    return c.json({ error: "Server not found" }, 404);
-  }
+    const access = await getServerAccess(db, params.serverId, user);
+    if (!access) {
+      return c.json({ error: "Server not found" }, 404);
+    }
 
-  const backup = await db
-    .select()
-    .from(schema.backups)
-    .where(
-      and(
-        eq(schema.backups.id, c.req.param("backupId")),
-        eq(schema.backups.serverId, access.server.id)
+    const backup = await db
+      .select()
+      .from(schema.backups)
+      .where(
+        and(
+          eq(schema.backups.id, params.backupId),
+          eq(schema.backups.serverId, access.server.id)
+        )
       )
-    )
-    .get();
+      .get();
 
-  if (!backup) {
-    return c.json({ error: "Backup not found" }, 404);
+    if (!backup) {
+      return c.json({ error: "Backup not found" }, 404);
+    }
+    if (!(backup.completedAt && backup.isSuccessful)) {
+      return c.json({ error: "Backup is not ready for download" }, 400);
+    }
+
+    const r2 = getR2Client(c.env);
+    const url = await getPresignedDownloadUrl(
+      r2,
+      backupKey(access.server.uuid, backup.uuid)
+    );
+
+    logActivity(c, {
+      event: "backup:download",
+      serverId: access.server.id,
+      metadata: { backupId: backup.id },
+    });
+
+    return c.json({ url });
   }
-  if (!(backup.completedAt && backup.isSuccessful)) {
-    return c.json({ error: "Backup is not ready for download" }, 400);
-  }
-
-  const s3 = getS3Client(c.env);
-  const url = await getPresignedDownloadUrl(
-    s3,
-    backupKey(access.server.uuid, backup.uuid)
-  );
-
-  logActivity(c, {
-    event: "backup:download",
-    serverId: access.server.id,
-    metadata: { backupId: backup.id },
-  });
-
-  return c.json({ url });
-});
+);
 
 // POST /api/servers/:serverId/backups/:backupId/lock — toggle lock
-backupRoutes.post("/:serverId/backups/:backupId/lock", async (c) => {
-  const user = c.get("user");
-  const db = getDb(c.env.DB);
+backupRoutes.post(
+  "/:serverId/backups/:backupId/lock",
+  zValidator("param", backupIdParam),
+  async (c) => {
+    const user = c.get("user");
+    const db = getDb(c.env.DB);
+    const params = c.req.valid("param");
 
-  const access = await getServerAccess(db, c.req.param("serverId"), user);
-  if (!access) {
-    return c.json({ error: "Server not found" }, 404);
-  }
+    const access = await getServerAccess(db, params.serverId, user);
+    if (!access) {
+      return c.json({ error: "Server not found" }, 404);
+    }
 
-  const backup = await db
-    .select()
-    .from(schema.backups)
-    .where(
-      and(
-        eq(schema.backups.id, c.req.param("backupId")),
-        eq(schema.backups.serverId, access.server.id)
+    const backup = await db
+      .select()
+      .from(schema.backups)
+      .where(
+        and(
+          eq(schema.backups.id, params.backupId),
+          eq(schema.backups.serverId, access.server.id)
+        )
       )
-    )
-    .get();
+      .get();
 
-  if (!backup) {
-    return c.json({ error: "Backup not found" }, 404);
+    if (!backup) {
+      return c.json({ error: "Backup not found" }, 404);
+    }
+
+    const newLocked = backup.isLocked ? 0 : 1;
+    await db
+      .update(schema.backups)
+      .set({ isLocked: newLocked })
+      .where(eq(schema.backups.id, backup.id));
+
+    logActivity(c, {
+      event: newLocked ? "backup:lock" : "backup:unlock",
+      serverId: access.server.id,
+      metadata: { backupId: backup.id },
+    });
+
+    return c.json({ isLocked: !!newLocked });
   }
-
-  const newLocked = backup.isLocked ? 0 : 1;
-  await db
-    .update(schema.backups)
-    .set({ isLocked: newLocked })
-    .where(eq(schema.backups.id, backup.id));
-
-  logActivity(c, {
-    event: newLocked ? "backup:lock" : "backup:unlock",
-    serverId: access.server.id,
-    metadata: { backupId: backup.id },
-  });
-
-  return c.json({ isLocked: !!newLocked });
-});
+);
 
 // POST /api/servers/:serverId/backups/:backupId/restore — restore from backup
 backupRoutes.post(
   "/:serverId/backups/:backupId/restore",
+  zValidator("param", backupIdParam),
   zValidator(
     "json",
     z.object({
@@ -257,9 +305,10 @@ backupRoutes.post(
   async (c) => {
     const user = c.get("user");
     const db = getDb(c.env.DB);
+    const params = c.req.valid("param");
     const { truncate } = c.req.valid("json");
 
-    const access = await getServerAccess(db, c.req.param("serverId"), user);
+    const access = await getServerAccess(db, params.serverId, user);
     if (!access) {
       return c.json({ error: "Server not found" }, 404);
     }
@@ -274,7 +323,7 @@ backupRoutes.post(
       .from(schema.backups)
       .where(
         and(
-          eq(schema.backups.id, c.req.param("backupId")),
+          eq(schema.backups.id, params.backupId),
           eq(schema.backups.serverId, server.id)
         )
       )
@@ -297,9 +346,9 @@ backupRoutes.post(
     }
 
     // Generate presigned download URL for Wings
-    const s3 = getS3Client(c.env);
+    const r2 = getR2Client(c.env);
     const downloadUrl = await getPresignedDownloadUrl(
-      s3,
+      r2,
       backupKey(server.uuid, backup.uuid)
     );
 
@@ -312,15 +361,23 @@ backupRoutes.post(
       })
       .where(eq(schema.servers.id, server.id));
 
-    // Tell Wings to restore
-    const client = new WingsClient(node);
-    await client.restoreBackup(
-      server.uuid,
-      backup.uuid,
-      "s3",
-      truncate,
-      downloadUrl
-    );
+    // Tell Wings to restore; rollback status on failure
+    try {
+      const client = new WingsClient(node);
+      await client.restoreBackup(
+        server.uuid,
+        backup.uuid,
+        "s3",
+        truncate,
+        downloadUrl
+      );
+    } catch (err) {
+      await db
+        .update(schema.servers)
+        .set({ status: null, updatedAt: new Date().toISOString() })
+        .where(eq(schema.servers.id, server.id));
+      throw err;
+    }
 
     logActivity(c, {
       event: "backup:restore",
@@ -334,49 +391,54 @@ backupRoutes.post(
 );
 
 // DELETE /api/servers/:serverId/backups/:backupId — delete a backup
-backupRoutes.delete("/:serverId/backups/:backupId", async (c) => {
-  const user = c.get("user");
-  const db = getDb(c.env.DB);
+backupRoutes.delete(
+  "/:serverId/backups/:backupId",
+  zValidator("param", backupIdParam),
+  async (c) => {
+    const user = c.get("user");
+    const db = getDb(c.env.DB);
+    const params = c.req.valid("param");
 
-  const access = await getServerAccess(db, c.req.param("serverId"), user);
-  if (!access) {
-    return c.json({ error: "Server not found" }, 404);
-  }
+    const access = await getServerAccess(db, params.serverId, user);
+    if (!access) {
+      return c.json({ error: "Server not found" }, 404);
+    }
 
-  const backup = await db
-    .select()
-    .from(schema.backups)
-    .where(
-      and(
-        eq(schema.backups.id, c.req.param("backupId")),
-        eq(schema.backups.serverId, access.server.id)
+    const backup = await db
+      .select()
+      .from(schema.backups)
+      .where(
+        and(
+          eq(schema.backups.id, params.backupId),
+          eq(schema.backups.serverId, access.server.id)
+        )
       )
-    )
-    .get();
+      .get();
 
-  if (!backup) {
-    return c.json({ error: "Backup not found" }, 404);
+    if (!backup) {
+      return c.json({ error: "Backup not found" }, 404);
+    }
+
+    if (backup.isLocked && backup.isSuccessful) {
+      return c.json({ error: "Backup is locked" }, 403);
+    }
+
+    // Delete from R2
+    try {
+      await c.env.R2.delete(backupKey(access.server.uuid, backup.uuid));
+    } catch {
+      // Object may not exist
+    }
+
+    // Delete DB row
+    await db.delete(schema.backups).where(eq(schema.backups.id, backup.id));
+
+    logActivity(c, {
+      event: "backup:delete",
+      serverId: access.server.id,
+      metadata: { backupId: backup.id, name: backup.name },
+    });
+
+    return c.body(null, 204);
   }
-
-  if (backup.isLocked && backup.isSuccessful) {
-    return c.json({ error: "Backup is locked" }, 403);
-  }
-
-  // Delete from R2
-  try {
-    await c.env.R2.delete(backupKey(access.server.uuid, backup.uuid));
-  } catch {
-    // Object may not exist
-  }
-
-  // Delete DB row
-  await db.delete(schema.backups).where(eq(schema.backups.id, backup.id));
-
-  logActivity(c, {
-    event: "backup:delete",
-    serverId: access.server.id,
-    metadata: { backupId: backup.id, name: backup.name },
-  });
-
-  return c.body(null, 204);
-});
+);

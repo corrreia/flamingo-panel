@@ -127,6 +127,7 @@ function BackupRow({
           {backup.completedAt && backup.isSuccessful ? (
             <>
               <Button
+                aria-label={`Download backup ${backup.name}`}
                 onClick={() => onDownload(backup.id)}
                 size="sm"
                 title="Download"
@@ -135,6 +136,7 @@ function BackupRow({
                 <Download className="h-4 w-4" />
               </Button>
               <Button
+                aria-label={`Restore backup ${backup.name}`}
                 onClick={() => onRestore(backup)}
                 size="sm"
                 title="Restore"
@@ -145,6 +147,11 @@ function BackupRow({
             </>
           ) : null}
           <Button
+            aria-label={
+              backup.isLocked
+                ? `Unlock backup ${backup.name}`
+                : `Lock backup ${backup.name}`
+            }
             disabled={lockMutation.isPending}
             onClick={() => lockMutation.mutate(backup.id)}
             size="sm"
@@ -158,6 +165,7 @@ function BackupRow({
             )}
           </Button>
           <Button
+            aria-label={`Delete backup ${backup.name}`}
             className="text-destructive hover:text-destructive"
             disabled={
               deleteMutation.isPending ||
@@ -325,7 +333,7 @@ export function BackupsTab({ serverId }: { serverId: string }) {
     const res = await api.get<{ url: string }>(
       `/servers/${serverId}/backups/${backupId}/download`
     );
-    window.open(res.url, "_blank");
+    window.open(res.url, "_blank", "noopener,noreferrer");
   };
 
   if (isLoading) {

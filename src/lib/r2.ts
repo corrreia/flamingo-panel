@@ -9,23 +9,30 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const PART_SIZE = 100 * 1024 * 1024; // 100 MB
-const BUCKET = "flamingo-r2";
+
+export interface R2Client {
+  bucket: string;
+  s3: S3Client;
+}
 
 /**
- * Create an S3Client configured to use a Cloudflare R2 account from environment values.
+ * Create an R2Client configured to use a Cloudflare R2 account from environment values.
  *
- * @param env - Environment object providing `CF_ACCOUNT_ID` (used to build the R2 endpoint), `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`
- * @returns An S3Client instance configured with the R2 endpoint and credentials from `env`
+ * @param env - Environment object providing `CF_ACCOUNT_ID` (used to build the R2 endpoint), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and optional `R2_BUCKET_NAME`
+ * @returns An R2Client with an S3Client instance and bucket name
  */
-export function getS3Client(env: Env): S3Client {
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-    },
-  });
+export function getR2Client(env: Env): R2Client {
+  return {
+    s3: new S3Client({
+      region: "auto",
+      endpoint: `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: env.R2_ACCESS_KEY_ID,
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      },
+    }),
+    bucket: env.R2_BUCKET_NAME || "flamingo-r2",
+  };
 }
 
 /**
@@ -47,11 +54,11 @@ export function backupKey(serverUuid: string, backupUuid: string): string {
  * @throws If the CreateMultipartUpload response does not contain an `UploadId`
  */
 export async function createMultipartUpload(
-  client: S3Client,
+  r2: R2Client,
   key: string
 ): Promise<string> {
-  const res = await client.send(
-    new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: key })
+  const res = await r2.s3.send(
+    new CreateMultipartUploadCommand({ Bucket: r2.bucket, Key: key })
   );
   if (!res.UploadId) {
     throw new Error("R2 CreateMultipartUpload did not return an UploadId");
@@ -68,7 +75,7 @@ export async function createMultipartUpload(
  * @returns An object with `parts`: an array of presigned upload URLs ordered by part number, and `part_size`: the byte size used for each part. 
  */
 export async function getPresignedUploadUrls(
-  client: S3Client,
+  r2: R2Client,
   key: string,
   uploadId: string,
   size: number
@@ -78,9 +85,9 @@ export async function getPresignedUploadUrls(
 
   for (let i = 1; i <= partCount; i++) {
     const url = await getSignedUrl(
-      client,
+      r2.s3,
       new UploadPartCommand({
-        Bucket: BUCKET,
+        Bucket: r2.bucket,
         Key: key,
         UploadId: uploadId,
         PartNumber: i,
@@ -101,18 +108,21 @@ export async function getPresignedUploadUrls(
  * @param parts - Array of uploaded parts where each entry provides the part's `etag` and its `part_number`; parts will be submitted in this form to complete the upload.
  */
 export async function completeMultipartUpload(
-  client: S3Client,
+  r2: R2Client,
   key: string,
   uploadId: string,
   parts: Array<{ etag: string; part_number: number }>
 ): Promise<void> {
-  await client.send(
+  // Sort by part number ascending to avoid InvalidPartOrder errors
+  const sorted = [...parts].sort((a, b) => a.part_number - b.part_number);
+
+  await r2.s3.send(
     new CompleteMultipartUploadCommand({
-      Bucket: BUCKET,
+      Bucket: r2.bucket,
       Key: key,
       UploadId: uploadId,
       MultipartUpload: {
-        Parts: parts.map((p) => ({
+        Parts: sorted.map((p) => ({
           ETag: p.etag,
           PartNumber: p.part_number,
         })),
@@ -128,13 +138,13 @@ export async function completeMultipartUpload(
  * @param uploadId - The multipart upload identifier returned when the upload was created
  */
 export async function abortMultipartUpload(
-  client: S3Client,
+  r2: R2Client,
   key: string,
   uploadId: string
 ): Promise<void> {
-  await client.send(
+  await r2.s3.send(
     new AbortMultipartUploadCommand({
-      Bucket: BUCKET,
+      Bucket: r2.bucket,
       Key: key,
       UploadId: uploadId,
     })
@@ -149,13 +159,13 @@ export async function abortMultipartUpload(
  * @returns A URL that can be used to perform a GET request for the object
  */
 export function getPresignedDownloadUrl(
-  client: S3Client,
+  r2: R2Client,
   key: string,
   expiresIn = 300
 ): Promise<string> {
   return getSignedUrl(
-    client,
-    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+    r2.s3,
+    new GetObjectCommand({ Bucket: r2.bucket, Key: key }),
     { expiresIn }
   );
 }
