@@ -92,6 +92,7 @@ function CreateServerPage() {
   const [disk, setDisk] = useState("1024");
   const [customDisk, setCustomDisk] = useState("");
   const [port, setPort] = useState("25565");
+  const [backupLimit, setBackupLimit] = useState("3");
   const [selectedImage, setSelectedImage] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
 
@@ -173,6 +174,7 @@ function CreateServerPage() {
         cpu: resolvedCpu,
         disk: resolvedDisk,
         defaultAllocationPort: Number.parseInt(port, 10),
+        backupLimit: Number.parseInt(backupLimit, 10),
         image: selectedImage || undefined,
         variables,
       }),
@@ -476,6 +478,19 @@ function CreateServerPage() {
                     value={port}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="srv-backup-limit">Backup Limit</Label>
+                  <Input
+                    id="srv-backup-limit"
+                    min="0"
+                    onChange={(e) => setBackupLimit(e.target.value)}
+                    type="number"
+                    value={backupLimit}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Set to 0 to disable backups for this server.
+                  </p>
+                </div>
               </div>
               <div className="flex justify-between">
                 <Button onClick={() => setStep(1)} variant="secondary">
@@ -598,6 +613,12 @@ function CreateServerPage() {
                 <div>
                   <span className="text-muted-foreground">Port:</span>
                   <span className="ml-2 font-medium">{port}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Backup Limit:</span>
+                  <span className="ml-2 font-medium">
+                    {backupLimit === "0" ? "Disabled" : backupLimit}
+                  </span>
                 </div>
               </div>
               {eggDetail && eggDetail.variables.length > 0 && (
