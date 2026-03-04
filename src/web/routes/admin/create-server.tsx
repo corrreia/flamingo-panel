@@ -73,7 +73,17 @@ function getStepClassName(i: number, step: number): string {
   return "bg-muted text-muted-foreground";
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-step wizard component
+/**
+ * Renders a multi-step "Create Server" wizard UI for configuring and creating a server.
+ *
+ * The component collects basic info, node/egg selection (including optional docker image),
+ * resource limits (memory, CPU, disk, port, backup limit), egg variables, and a final review,
+ * then submits the assembled payload to the server creation API.
+ *
+ * On successful creation it navigates to the root page; on error it displays the error message.
+ *
+ * @returns The JSX element for the Create Server page.
+ */
 function CreateServerPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);

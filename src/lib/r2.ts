@@ -11,6 +11,12 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 const PART_SIZE = 100 * 1024 * 1024; // 100 MB
 const BUCKET = "flamingo-r2";
 
+/**
+ * Create an S3Client configured to use a Cloudflare R2 account from environment values.
+ *
+ * @param env - Environment object providing `CF_ACCOUNT_ID` (used to build the R2 endpoint), `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`
+ * @returns An S3Client instance configured with the R2 endpoint and credentials from `env`
+ */
 export function getS3Client(env: Env): S3Client {
   return new S3Client({
     region: "auto",
@@ -22,10 +28,24 @@ export function getS3Client(env: Env): S3Client {
   });
 }
 
+/**
+ * Builds the storage object key for a server backup.
+ *
+ * @param serverUuid - The server's UUID to include in the path
+ * @param backupUuid - The backup's UUID to use as the filename (without extension)
+ * @returns The object key in the form `backups/{serverUuid}/{backupUuid}.tar.gz`
+ */
 export function backupKey(serverUuid: string, backupUuid: string): string {
   return `backups/${serverUuid}/${backupUuid}.tar.gz`;
 }
 
+/**
+ * Initiates a multipart upload for the specified object key and returns its upload ID.
+ *
+ * @param key - The object key (path) to create the multipart upload for
+ * @returns The multipart upload `UploadId`
+ * @throws If the CreateMultipartUpload response does not contain an `UploadId`
+ */
 export async function createMultipartUpload(
   client: S3Client,
   key: string
@@ -39,6 +59,14 @@ export async function createMultipartUpload(
   return res.UploadId;
 }
 
+/**
+ * Generate presigned URLs for uploading each part of a multipart object.
+ *
+ * @param key - Object key (path) in the bucket.
+ * @param uploadId - Multipart upload session identifier.
+ * @param size - Total size of the object to be uploaded, in bytes.
+ * @returns An object with `parts`: an array of presigned upload URLs ordered by part number, and `part_size`: the byte size used for each part. 
+ */
 export async function getPresignedUploadUrls(
   client: S3Client,
   key: string,
@@ -65,6 +93,13 @@ export async function getPresignedUploadUrls(
   return { parts, part_size: PART_SIZE };
 }
 
+/**
+ * Finalizes a multipart upload for the specified object by assembling uploaded parts into the final object.
+ *
+ * @param key - The object key (path) in the configured bucket.
+ * @param uploadId - The multipart upload identifier returned when the upload was created.
+ * @param parts - Array of uploaded parts where each entry provides the part's `etag` and its `part_number`; parts will be submitted in this form to complete the upload.
+ */
 export async function completeMultipartUpload(
   client: S3Client,
   key: string,
@@ -86,6 +121,12 @@ export async function completeMultipartUpload(
   );
 }
 
+/**
+ * Aborts an in-progress multipart upload for the object identified by `key`.
+ *
+ * @param key - The object key in the R2 bucket to abort the multipart upload for
+ * @param uploadId - The multipart upload identifier returned when the upload was created
+ */
 export async function abortMultipartUpload(
   client: S3Client,
   key: string,
@@ -100,6 +141,13 @@ export async function abortMultipartUpload(
   );
 }
 
+/**
+ * Generates a presigned URL to download an object from the configured R2 bucket.
+ *
+ * @param key - Object key within the bucket
+ * @param expiresIn - Expiration time in seconds for the URL (default: 300)
+ * @returns A URL that can be used to perform a GET request for the object
+ */
 export function getPresignedDownloadUrl(
   client: S3Client,
   key: string,

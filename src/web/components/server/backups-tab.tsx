@@ -61,6 +61,12 @@ interface BackupsResponse {
   backups: Backup[];
 }
 
+/**
+ * Renders a status badge for the given backup.
+ *
+ * @param backup - The backup whose status will be displayed
+ * @returns A JSX element containing a status Badge: `In Progress` if the backup has not completed, `Completed` if it finished successfully, or `Failed` otherwise
+ */
 function getStatusBadge(backup: Backup) {
   if (!backup.completedAt) {
     return (
@@ -76,6 +82,16 @@ function getStatusBadge(backup: Backup) {
   return <Badge variant="destructive">Failed</Badge>;
 }
 
+/**
+ * Render a table row for a backup with actions for download, restore, lock/unlock, and delete.
+ *
+ * @param backup - The backup entry to display.
+ * @param deleteMutation - Deletion controller with `isPending` (loading state) and `mutate(id)` to delete the backup.
+ * @param lockMutation - Lock controller with `isPending` (loading state) and `mutate(id)` to toggle lock state.
+ * @param onDownload - Callback invoked with the backup `id` to initiate a download.
+ * @param onRestore - Callback invoked with the `backup` object to initiate a restore.
+ * @returns The table row element representing the provided backup.
+ */
 function BackupRow({
   backup,
   deleteMutation,
@@ -160,6 +176,17 @@ function BackupRow({
   );
 }
 
+/**
+ * Render the backups table or a contextual message when backups are disabled or none exist.
+ *
+ * @param backupLimit - The maximum number of backups allowed for the server; when this is less than or equal to zero a "Backups are disabled" message is shown.
+ * @param backups - The list of backups to display in the table.
+ * @param deleteMutation - Controls for the delete action; `isPending` disables delete controls and `mutate(id)` triggers deletion for the given backup id.
+ * @param lockMutation - Controls for the lock/unlock action; `isPending` disables the lock control and `mutate(id)` toggles lock state for the given backup id.
+ * @param onDownload - Callback invoked with a backup id to initiate a download for that backup.
+ * @param onRestore - Callback invoked with a `Backup` object to begin a restore flow for that backup.
+ * @returns A React element containing the backups table, or a centered message indicating backups are disabled or none exist.
+ */
 function BackupContent({
   backupLimit,
   backups,
@@ -218,6 +245,13 @@ function BackupContent({
   );
 }
 
+/**
+ * Renders the Backups management tab for a server, providing listing, creation, download,
+ * lock/unlock, deletion, and restore functionality for backups.
+ *
+ * @param serverId - The server identifier whose backups are managed
+ * @returns A React element containing the backups UI (table, dialogs, and actions)
+ */
 export function BackupsTab({ serverId }: { serverId: string }) {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);

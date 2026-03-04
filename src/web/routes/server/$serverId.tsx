@@ -100,6 +100,14 @@ function getStatusLabel(s: ServerDetail): string {
   return s.containerStatus || s.resources?.state || "offline";
 }
 
+/**
+ * Displays the server page for the current route's serverId, including header, resource stats, and tabbed views.
+ *
+ * Renders a loading skeleton while server data is being fetched and shows a "Server not found." message if no server is returned.
+ * When data is available, presents a page header with power controls and status, an optional utilization strip, and tabs for Console, Files, Backups, Activity, and—when the user has permission—Settings and Users.
+ *
+ * @returns The JSX element representing the server details page for the route's `serverId`
+ */
 function ServerPage() {
   const { serverId } = Route.useParams();
 
