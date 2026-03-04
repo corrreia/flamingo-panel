@@ -40,21 +40,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { useState } from "react";
-
-interface Backup {
-  bytes: number;
-  checksum: string | null;
-  completedAt: string | null;
-  createdAt: string;
-  id: string;
-  ignoredFiles: string;
-  isLocked: number;
-  isSuccessful: number;
-  name: string;
-  serverId: string;
-  uploadId: string | null;
-  uuid: string;
-}
+import type { Backup } from "@/db/schema";
 
 interface BackupsResponse {
   backupLimit: number;

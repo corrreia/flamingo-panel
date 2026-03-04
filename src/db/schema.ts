@@ -126,6 +126,8 @@ export const backups = sqliteTable(
   (table) => [index("idx_backups_server").on(table.serverId)]
 );
 
+export type Backup = typeof backups.$inferSelect;
+
 export const eggVariables = sqliteTable(
   "egg_variables",
   {
