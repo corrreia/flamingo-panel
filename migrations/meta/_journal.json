@@ -15,6 +15,13 @@
       "when": 1772412392683,
       "tag": "0001_bent_post",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772626722735,
+      "tag": "0002_keen_corsair",
+      "breakpoints": true
     }
   ]
 }

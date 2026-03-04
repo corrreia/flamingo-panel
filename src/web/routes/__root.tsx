@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
 } from "@tanstack/react-router";
+import { Toaster } from "@web/components/ui/sonner";
 import appCss from "@web/index.css?url";
 import { AuthProvider } from "@web/lib/auth";
 
@@ -48,6 +49,7 @@ function RootComponent() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <Outlet />
+          <Toaster />
         </AuthProvider>
       </QueryClientProvider>
     </RootDocument>

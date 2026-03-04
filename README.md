@@ -22,34 +22,44 @@ Pelican Panel requires a PHP server, MySQL database, Redis, and a reverse proxy.
 - Admin UI for managing nodes (create, edit, delete, view system info)
 - `wings configure` auto-setup (one-time API key, configure command generation)
 - Wings connectivity check (online/offline status, OS/kernel/Docker info)
-- Egg management (import from Pelican JSON, list, detail, create)
-- User registration and login
-- Activity logging (admin page with filters/pagination, server activity tab)
+- Egg management (import from Pelican JSON, create, edit, export, list, detail)
+- User management (registration, login, admin user list)
+- Activity logging (admin page with filters/pagination, server activity tab, Wings activity)
+- Notification system (in-app notifications with bell icon)
+- User resource allocations and port management
+- Subuser management (add/remove subusers with permissions)
+- Server file manager (list, edit, upload, download, rename, copy, compress, delete)
+- Server console (WebSocket terminal via Durable Objects)
+- Server power actions (start, stop, restart, kill)
+- Real-time node metrics (CPU, memory, disk via WebSocket)
 
 ## TODO
 
 - [ ] Server installation on Wings (payload is sent but install flow is incomplete)
-- [ ] Server console (WebSocket proxy via Durable Objects — partially built)
-- [ ] File manager (proxies to Wings — partially built)
-- [ ] Power actions (start/stop/restart/kill)
 - [ ] OpenID Connect / OAuth authentication (replace password auth)
 - [ ] Cloudflare Tunnel integration for automatic Wings connectivity
 - [ ] Server backups (Wings backup API integration)
-- [ ] Subuser permissions
 - [ ] Server schedules / tasks
-- [ ] Server resource usage monitoring
 - [ ] Production deployment and setup docs
 
 ## Stack
 
-- **Runtime:** Cloudflare Workers
-- **Database:** Cloudflare D1 (SQLite)
-- **Sessions/Cache:** Cloudflare KV
-- **File Storage:** Cloudflare R2
-- **WebSocket Proxy:** Durable Objects
-- **API:** Hono + Zod
-- **Frontend:** TanStack Start (SSR) + TanStack Router + TanStack Query + React + Tailwind CSS + shadcn/ui
-- **ORM:** Drizzle
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Cloudflare Workers |
+| Database | Cloudflare D1 (SQLite) via Drizzle ORM |
+| Sessions/Cache | Cloudflare KV |
+| File Storage | Cloudflare R2 |
+| WebSockets | Durable Objects |
+| API | Hono + Zod |
+| Auth | Better Auth |
+| Frontend | TanStack Start (SSR) + TanStack Router + TanStack Query |
+| UI | React 19 + Tailwind CSS v4 + shadcn/ui + Radix UI |
+| Terminal | xterm.js |
+| Code Editor | CodeMirror 6 |
+| Linting | Biome |
+| Build | Vite |
+| Package Manager | Bun |
 
 ## Getting Started
 
@@ -61,6 +71,8 @@ bun run dev
 ```
 
 Set `PANEL_URL` in `wrangler.jsonc` to the URL where your panel is reachable (e.g. a cloudflared tunnel URL).
+
+Copy `.env.example` to `.env` and fill in `BETTER_AUTH_SECRET` and any OIDC credentials.
 
 ## Wings Setup
 
@@ -77,15 +89,14 @@ Set `PANEL_URL` in `wrangler.jsonc` to the URL where your panel is reachable (e.
 | `bun run dev` | Start local dev server (Vite + Miniflare with all CF bindings) |
 | `bun run build` | Build client + server bundles |
 | `bun run deploy` | Build + deploy to Cloudflare |
-| `bun run db:generate` | Generate migrations from schema |
-| `bun run db:migrate:dev` | Apply migrations locally |
-| `bun run db:migrate:prod` | Apply migrations to production |
-| `bun run db:studio` | Open Drizzle Studio |
-| `bun run studio` | Local Drizzle Studio via localflare |
 | `bun run test` | Run Vitest tests |
 | `bun run lint` | Biome lint |
 | `bun run format` | Biome auto-format |
 | `bun run check` | Biome check with auto-fix |
+| `bun run db:generate` | Generate migrations from schema |
+| `bun run db:migrate:dev` | Apply migrations locally |
+| `bun run db:migrate:prod` | Apply migrations to production |
+| `bun run db:studio` | Open Drizzle Studio |
 
 ## License
 
