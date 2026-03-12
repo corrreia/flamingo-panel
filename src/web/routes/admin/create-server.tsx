@@ -59,6 +59,36 @@ interface EggDetail extends EggItem {
   variables: EggVariable[];
 }
 
+function parseDockerImagesMap(
+  dockerImages: string | null | undefined
+): Record<string, string> | null {
+  if (!dockerImages) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(dockerImages) as Record<string, string>;
+    return Object.keys(parsed).length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildStepValidity(
+  name: string,
+  ownerId: string,
+  nodeId: string,
+  eggId: string
+) {
+  return [
+    { label: "Basics", valid: !!name && !!ownerId },
+    { label: "Node & Egg", valid: !!nodeId && !!eggId },
+    { label: "Resources", valid: true },
+    { label: "Variables", valid: true },
+    { label: "Review", valid: true },
+  ];
+}
+
 export const Route = createFileRoute("/admin/create-server")({
   component: CreateServerPage,
 });
@@ -84,6 +114,7 @@ function getStepClassName(i: number, step: number): string {
  *
  * @returns The JSX element for the Create Server page.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Multi-step wizard kept inline for clarity
 function CreateServerPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -152,20 +183,7 @@ function CreateServerPage() {
   }, [eggDetail]);
 
   // Parse docker images map from egg detail
-  const dockerImagesMap: Record<string, string> | null = (() => {
-    if (!eggDetail?.dockerImages) {
-      return null;
-    }
-    try {
-      const parsed = JSON.parse(eggDetail.dockerImages) as Record<
-        string,
-        string
-      >;
-      return Object.keys(parsed).length > 0 ? parsed : null;
-    } catch {
-      return null;
-    }
-  })();
+  const dockerImagesMap = parseDockerImagesMap(eggDetail?.dockerImages);
 
   const resolvedMemory =
     memory === "custom" ? Number(customMemory) : Number(memory);
@@ -203,13 +221,7 @@ function CreateServerPage() {
     );
   }
 
-  const steps = [
-    { label: "Basics", valid: !!name && !!ownerId },
-    { label: "Node & Egg", valid: !!nodeId && !!eggId },
-    { label: "Resources", valid: true },
-    { label: "Variables", valid: true },
-    { label: "Review", valid: true },
-  ];
+  const steps = buildStepValidity(name, ownerId, nodeId, eggId);
 
   return (
     <Layout>

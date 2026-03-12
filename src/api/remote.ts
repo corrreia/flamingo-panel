@@ -25,6 +25,24 @@ interface RemoteEnv {
 
 export const remoteRoutes = new Hono<RemoteEnv>();
 
+const encoder = new TextEncoder();
+
+function tokensMatch(left: string, right: string): boolean {
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
+
+  if (leftBytes.byteLength !== rightBytes.byteLength) {
+    return false;
+  }
+
+  let mismatch = 0;
+  for (let index = 0; index < leftBytes.length; index++) {
+    mismatch += Math.abs(leftBytes[index] - rightBytes[index]);
+  }
+
+  return mismatch === 0;
+}
+
 // Wings authenticates with "Bearer {tokenId}.{token}" - verify against stored node tokens
 remoteRoutes.use("*", async (c, next) => {
   const auth = c.req.header("Authorization");
@@ -45,7 +63,7 @@ remoteRoutes.use("*", async (c, next) => {
     .from(schema.nodes)
     .where(eq(schema.nodes.tokenId, tokenId))
     .get();
-  if (!node || node.token !== token) {
+  if (!(node && tokensMatch(node.token, token))) {
     return c.json({ error: "Forbidden" }, 403);
   }
   c.set("node", node);
@@ -75,34 +93,63 @@ remoteRoutes.get("/servers", async (c) => {
     .where(eq(schema.servers.nodeId, node.id))
     .get();
 
-  const data = await Promise.all(
-    servers.map(async (s) => {
-      const egg = s.eggId
-        ? await db
-            .select()
-            .from(schema.eggs)
-            .where(eq(schema.eggs.id, s.eggId))
-            .get()
-        : null;
+  const serverIds = servers.map((server) => server.id);
+  const eggIds = [...new Set(servers.flatMap((server) => server.eggId ?? []))];
 
-      const eggVars = s.eggId
-        ? await db
-            .select()
-            .from(schema.eggVariables)
-            .where(eq(schema.eggVariables.eggId, s.eggId))
-            .all()
-        : [];
+  const [eggs, eggVars, serverVars] = await Promise.all([
+    eggIds.length > 0
+      ? db
+          .select()
+          .from(schema.eggs)
+          .where(inArray(schema.eggs.id, eggIds))
+          .all()
+      : Promise.resolve([]),
+    eggIds.length > 0
+      ? db
+          .select()
+          .from(schema.eggVariables)
+          .where(inArray(schema.eggVariables.eggId, eggIds))
+          .all()
+      : Promise.resolve([]),
+    serverIds.length > 0
+      ? db
+          .select()
+          .from(schema.serverVariables)
+          .where(inArray(schema.serverVariables.serverId, serverIds))
+          .all()
+      : Promise.resolve([]),
+  ]);
 
-      const serverVars = await db
-        .select()
-        .from(schema.serverVariables)
-        .where(eq(schema.serverVariables.serverId, s.id))
-        .all();
+  const eggsById = new Map(eggs.map((egg) => [egg.id, egg]));
+  const eggVarsByEggId = new Map<string, (typeof eggVars)[number][]>();
+  const serverVarsByServerId = new Map<string, (typeof serverVars)[number][]>();
 
-      const environment = buildServerEnvironment(s, eggVars, serverVars);
-      return buildBootConfig(s, egg ?? null, environment);
-    })
-  );
+  for (const variable of eggVars) {
+    const list = eggVarsByEggId.get(variable.eggId) ?? [];
+    list.push(variable);
+    eggVarsByEggId.set(variable.eggId, list);
+  }
+
+  for (const variable of serverVars) {
+    const list = serverVarsByServerId.get(variable.serverId) ?? [];
+    list.push(variable);
+    serverVarsByServerId.set(variable.serverId, list);
+  }
+
+  const data = servers.map((server) => {
+    const egg = server.eggId ? (eggsById.get(server.eggId) ?? null) : null;
+    const eggVariables = server.eggId
+      ? (eggVarsByEggId.get(server.eggId) ?? [])
+      : [];
+    const serverVariables = serverVarsByServerId.get(server.id) ?? [];
+    const environment = buildServerEnvironment(
+      server,
+      eggVariables,
+      serverVariables
+    );
+
+    return buildBootConfig(server, egg, environment);
+  });
 
   return c.json({
     data,
@@ -291,14 +338,16 @@ remoteRoutes.post("/activity", async (c) => {
     ...new Set(body.data.map((a) => a.server).filter(Boolean)),
   ];
   const serverMap = new Map<string, string>();
-  for (const uuid of serverUuids) {
-    const server = await db
-      .select({ id: schema.servers.id })
+
+  if (serverUuids.length > 0) {
+    const servers = await db
+      .select({ id: schema.servers.id, uuid: schema.servers.uuid })
       .from(schema.servers)
-      .where(eq(schema.servers.uuid, uuid))
-      .get();
-    if (server) {
-      serverMap.set(uuid, server.id);
+      .where(inArray(schema.servers.uuid, serverUuids))
+      .all();
+
+    for (const server of servers) {
+      serverMap.set(server.uuid, server.id);
     }
   }
 

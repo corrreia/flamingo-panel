@@ -31,6 +31,7 @@ import {
 import { type Utilization, useNodeMetrics } from "@web/hooks/use-node-metrics";
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
+import { type NodeItem, nodesQueryOptions } from "@web/lib/queries";
 import {
   Check,
   Copy,
@@ -41,13 +42,6 @@ import {
   Plus,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-
-interface NodeItem {
-  createdAt: string;
-  id: number;
-  name: string;
-  url: string;
-}
 
 interface CreatedNode extends NodeItem {
   configureCommand: string;
@@ -198,6 +192,8 @@ function NodesList({
 }
 
 export const Route = createFileRoute("/admin/nodes/")({
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(nodesQueryOptions()),
   component: NodesPage,
 });
 
@@ -253,8 +249,7 @@ function NodesPage() {
   }, [metricsMap]);
 
   const { data: nodes, isLoading } = useQuery({
-    queryKey: ["nodes"],
-    queryFn: () => api.get<NodeItem[]>("/nodes"),
+    ...nodesQueryOptions(),
   });
 
   const createMutation = useMutation({

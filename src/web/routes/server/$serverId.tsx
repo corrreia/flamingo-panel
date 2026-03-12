@@ -35,6 +35,7 @@ import {
 } from "@web/components/ui/tabs";
 import { api } from "@web/lib/api";
 import { formatBytes } from "@web/lib/format";
+import { type ServerDetail, serverQueryOptions } from "@web/lib/queries";
 import {
   Archive,
   ClipboardList,
@@ -50,31 +51,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-interface ServerDetail {
-  containerStatus: string | null;
-  cpu: number;
-  disk: number;
-  id: string;
-  memory: number;
-  name: string;
-  resources?: {
-    state: string;
-    utilization: {
-      memory_bytes: number;
-      memory_limit_bytes: number;
-      cpu_absolute: number;
-      network: { rx_bytes: number; tx_bytes: number };
-      uptime: number;
-      disk_bytes: number;
-      state: string;
-    };
-  } | null;
-  role: "admin" | "owner" | "subuser";
-  status: string | null;
-  uuid: string;
-}
-
 export const Route = createFileRoute("/server/$serverId")({
+  loader: ({ context, params }) =>
+    context.queryClient.ensureQueryData(serverQueryOptions(params.serverId)),
   component: ServerPage,
 });
 
@@ -112,9 +91,7 @@ function ServerPage() {
   const { serverId } = Route.useParams();
 
   const { data: server, isLoading } = useQuery({
-    queryKey: ["server", serverId],
-    queryFn: () => api.get<ServerDetail>(`/servers/${serverId}`),
-    refetchInterval: 10_000,
+    ...serverQueryOptions(serverId),
   });
 
   if (isLoading) {

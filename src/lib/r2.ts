@@ -1,79 +1,69 @@
-import {
-  AbortMultipartUploadCommand,
-  CompleteMultipartUploadCommand,
-  CreateMultipartUploadCommand,
-  GetObjectCommand,
-  S3Client,
-  UploadPartCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { AwsClient } from "aws4fetch";
 
-const PART_SIZE = 100 * 1024 * 1024; // 100 MB
+const PART_SIZE = 100 * 1024 * 1024;
+const UPLOAD_ID_RE = /<UploadId>(.+?)<\/UploadId>/;
 
 export interface R2Client {
   bucket: string;
-  s3: S3Client;
+  client: AwsClient;
+  endpoint: string;
 }
 
-/**
- * Create an R2Client configured to use a Cloudflare R2 account from environment values.
- *
- * @param env - Environment object providing `CF_ACCOUNT_ID` (used to build the R2 endpoint), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and optional `R2_BUCKET_NAME`
- * @returns An R2Client with an S3Client instance and bucket name
- */
+function getObjectUrl(r2: R2Client, key: string): URL {
+  return new URL(`${r2.endpoint}/${r2.bucket}/${key}`);
+}
+
+async function sendRequest(
+  r2: R2Client,
+  request: Request,
+  init?: Parameters<AwsClient["fetch"]>[1]
+): Promise<Response> {
+  const response = await r2.client.fetch(request, init);
+
+  if (!response.ok) {
+    throw new Error(
+      `R2 request failed (${response.status}): ${await response.text()}`
+    );
+  }
+
+  return response;
+}
+
 export function getR2Client(env: Env): R2Client {
   return {
-    s3: new S3Client({
+    client: new AwsClient({
+      accessKeyId: env.R2_ACCESS_KEY_ID,
       region: "auto",
-      endpoint: `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: env.R2_ACCESS_KEY_ID,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-      },
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      service: "s3",
     }),
     bucket: env.R2_BUCKET_NAME || "flamingo-r2",
+    endpoint: `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   };
 }
 
-/**
- * Builds the storage object key for a server backup.
- *
- * @param serverUuid - The server's UUID to include in the path
- * @param backupUuid - The backup's UUID to use as the filename (without extension)
- * @returns The object key in the form `backups/{serverUuid}/{backupUuid}.tar.gz`
- */
 export function backupKey(serverUuid: string, backupUuid: string): string {
   return `backups/${serverUuid}/${backupUuid}.tar.gz`;
 }
 
-/**
- * Initiates a multipart upload for the specified object key and returns its upload ID.
- *
- * @param key - The object key (path) to create the multipart upload for
- * @returns The multipart upload `UploadId`
- * @throws If the CreateMultipartUpload response does not contain an `UploadId`
- */
 export async function createMultipartUpload(
   r2: R2Client,
   key: string
 ): Promise<string> {
-  const res = await r2.s3.send(
-    new CreateMultipartUploadCommand({ Bucket: r2.bucket, Key: key })
-  );
-  if (!res.UploadId) {
+  const url = getObjectUrl(r2, key);
+  url.searchParams.set("uploads", "");
+
+  const response = await sendRequest(r2, new Request(url, { method: "POST" }));
+  const text = await response.text();
+  const uploadId = text.match(UPLOAD_ID_RE)?.[1];
+
+  if (!uploadId) {
     throw new Error("R2 CreateMultipartUpload did not return an UploadId");
   }
-  return res.UploadId;
+
+  return uploadId;
 }
 
-/**
- * Generate presigned URLs for uploading each part of a multipart object.
- *
- * @param key - Object key (path) in the bucket.
- * @param uploadId - Multipart upload session identifier.
- * @param size - Total size of the object to be uploaded, in bytes.
- * @returns An object with `parts`: an array of presigned upload URLs ordered by part number, and `part_size`: the byte size used for each part.
- */
 export async function getPresignedUploadUrls(
   r2: R2Client,
   key: string,
@@ -81,91 +71,84 @@ export async function getPresignedUploadUrls(
   size: number
 ): Promise<{ parts: string[]; part_size: number }> {
   const partCount = Math.ceil(size / PART_SIZE);
-  const parts: string[] = [];
+  const parts = await Promise.all(
+    Array.from({ length: partCount }, async (_, index) => {
+      const url = getObjectUrl(r2, key);
+      url.searchParams.set("X-Amz-Expires", "3600");
+      url.searchParams.set("partNumber", String(index + 1));
+      url.searchParams.set("uploadId", uploadId);
 
-  for (let i = 1; i <= partCount; i++) {
-    const url = await getSignedUrl(
-      r2.s3,
-      new UploadPartCommand({
-        Bucket: r2.bucket,
-        Key: key,
-        UploadId: uploadId,
-        PartNumber: i,
-      }),
-      { expiresIn: 3600 }
-    );
-    parts.push(url);
-  }
+      const signed = await r2.client.sign(new Request(url, { method: "PUT" }), {
+        aws: { signQuery: true },
+      });
 
-  return { parts, part_size: PART_SIZE };
+      return signed.url;
+    })
+  );
+
+  return { part_size: PART_SIZE, parts };
 }
 
-/**
- * Finalizes a multipart upload for the specified object by assembling uploaded parts into the final object.
- *
- * @param key - The object key (path) in the configured bucket.
- * @param uploadId - The multipart upload identifier returned when the upload was created.
- * @param parts - Array of uploaded parts where each entry provides the part's `etag` and its `part_number`; parts will be submitted in this form to complete the upload.
- */
 export async function completeMultipartUpload(
   r2: R2Client,
   key: string,
   uploadId: string,
   parts: Array<{ etag: string; part_number: number }>
 ): Promise<void> {
-  // Sort by part number ascending to avoid InvalidPartOrder errors
-  const sorted = [...parts].sort((a, b) => a.part_number - b.part_number);
+  const url = getObjectUrl(r2, key);
+  url.searchParams.set("uploadId", uploadId);
 
-  await r2.s3.send(
-    new CompleteMultipartUploadCommand({
-      Bucket: r2.bucket,
-      Key: key,
-      UploadId: uploadId,
-      MultipartUpload: {
-        Parts: sorted.map((p) => ({
-          ETag: p.etag,
-          PartNumber: p.part_number,
-        })),
+  const sortedParts = [...parts].sort(
+    (left, right) => left.part_number - right.part_number
+  );
+  const body = [
+    "<CompleteMultipartUpload>",
+    ...sortedParts.map(
+      (part) =>
+        `<Part><PartNumber>${part.part_number}</PartNumber><ETag>${part.etag}</ETag></Part>`
+    ),
+    "</CompleteMultipartUpload>",
+  ].join("");
+
+  await sendRequest(
+    r2,
+    new Request(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/xml",
       },
+      body,
     })
   );
 }
 
-/**
- * Aborts an in-progress multipart upload for the object identified by `key`.
- *
- * @param key - The object key in the R2 bucket to abort the multipart upload for
- * @param uploadId - The multipart upload identifier returned when the upload was created
- */
 export async function abortMultipartUpload(
   r2: R2Client,
   key: string,
   uploadId: string
 ): Promise<void> {
-  await r2.s3.send(
-    new AbortMultipartUploadCommand({
-      Bucket: r2.bucket,
-      Key: key,
-      UploadId: uploadId,
+  const url = getObjectUrl(r2, key);
+  url.searchParams.set("uploadId", uploadId);
+
+  await sendRequest(
+    r2,
+    new Request(url, {
+      method: "DELETE",
     })
   );
 }
 
-/**
- * Generates a presigned URL to download an object from the configured R2 bucket.
- *
- * @param key - Object key within the bucket
- * @param expiresIn - Expiration time in seconds for the URL (default: 300)
- * @returns A URL that can be used to perform a GET request for the object
- */
-export function getPresignedDownloadUrl(
+export async function getPresignedDownloadUrl(
   r2: R2Client,
   key: string,
   expiresIn = 300
 ): Promise<string> {
-  return getSignedUrl(
-    r2.s3,
-    new GetObjectCommand({ Bucket: r2.bucket, Key: key }),
-    { expiresIn }
-  );
+  const url = getObjectUrl(r2, key);
+  url.searchParams.set("X-Amz-Expires", String(expiresIn));
+
+  const signed = await r2.client.sign(new Request(url, { method: "GET" }), {
+    aws: { signQuery: true },
+  });
+
+  return signed.url;
 }

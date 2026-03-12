@@ -68,71 +68,76 @@ function UsersPage() {
     queryFn: () => api.get<UserItem[]>("/users"),
   });
 
+  let content: React.ReactNode;
+
+  if (isLoading) {
+    content = (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton className="h-16" key={i} />
+        ))}
+      </div>
+    );
+  } else if (users?.length) {
+    content = (
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead className="hidden md:table-cell">Role</TableHead>
+              <TableHead className="hidden text-right md:table-cell">
+                Servers
+              </TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell>
+                  <div>
+                    <div className="font-medium">{u.username || "-"}</div>
+                    <div className="text-muted-foreground text-xs">
+                      {u.email}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <Badge variant={u.role === "admin" ? "default" : "secondary"}>
+                    {u.role}
+                  </Badge>
+                </TableCell>
+                <TableCell className="hidden text-right md:table-cell">
+                  {u.serverCount}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    onClick={() => {
+                      setEditUserId(u.id);
+                      setEditUsername(u.username || u.email);
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Allocations
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    );
+  } else {
+    content = <EmptyState icon={Users} title="No users found." />;
+  }
+
   return (
     <Layout>
       <div className="space-y-6">
         <PageHeader backTo="/" title="Users" />
-
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton className="h-16" key={i} />
-            ))}
-          </div>
-        ) : users?.length ? (
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead className="hidden md:table-cell">Role</TableHead>
-                  <TableHead className="hidden text-right md:table-cell">
-                    Servers
-                  </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{u.username || "-"}</div>
-                        <div className="text-muted-foreground text-xs">
-                          {u.email}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge
-                        variant={u.role === "admin" ? "default" : "secondary"}
-                      >
-                        {u.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden text-right md:table-cell">
-                      {u.serverCount}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        onClick={() => {
-                          setEditUserId(u.id);
-                          setEditUsername(u.username || u.email);
-                        }}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Allocations
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        ) : (
-          <EmptyState icon={Users} title="No users found." />
-        )}
+        {content}
       </div>
 
       {editUserId && (

@@ -74,6 +74,18 @@ function formatRelativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
+function getLevelIcon(level: string) {
+  if (level === "critical") {
+    return OctagonAlert;
+  }
+
+  if (level === "warning") {
+    return AlertTriangle;
+  }
+
+  return null;
+}
+
 export function NotificationBell() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -161,23 +173,20 @@ export function NotificationBell() {
             <div className="flex items-center justify-center py-8">
               <span className="text-muted-foreground text-sm">Loading...</span>
             </div>
-          ) : notifications.length === 0 ? (
+          ) : null}
+          {!isLoading && notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8">
               <Bell className="mb-2 h-8 w-8 text-muted-foreground/50" />
               <span className="text-muted-foreground text-sm">
                 No notifications
               </span>
             </div>
-          ) : (
+          ) : null}
+          {!isLoading && notifications.length > 0 ? (
             <div className="divide-y">
               {notifications.map((n) => {
                 const Icon = categoryIcons[n.category] || Info;
-                const LevelIcon =
-                  n.level === "critical"
-                    ? OctagonAlert
-                    : n.level === "warning"
-                      ? AlertTriangle
-                      : null;
+                const LevelIcon = getLevelIcon(n.level);
 
                 return (
                   <div
@@ -249,7 +258,7 @@ export function NotificationBell() {
                 );
               })}
             </div>
-          )}
+          ) : null}
         </ScrollArea>
       </PopoverContent>
     </Popover>

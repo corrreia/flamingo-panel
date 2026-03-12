@@ -10,28 +10,24 @@ import {
   CardTitle,
 } from "@web/components/ui/card";
 import { Skeleton } from "@web/components/ui/skeleton";
-import { api } from "@web/lib/api";
-import type { AllocationResponse } from "@web/lib/types";
+import {
+  allocationsQueryOptions,
+  type DashboardServerItem,
+  serversQueryOptions,
+} from "@web/lib/queries";
 import { Cpu, HardDrive, MemoryStick, Network, Server } from "lucide-react";
 
-interface ServerItem {
-  containerStatus: string | null;
-  cpu: number;
-  disk: number;
-  id: string;
-  memory: number;
-  name: string;
-  role: "admin" | "owner" | "subuser";
-  status: string | null;
-  uuid: string;
-}
-
 export const Route = createFileRoute("/")({
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(serversQueryOptions()),
+      context.queryClient.ensureQueryData(allocationsQueryOptions()),
+    ]),
   component: DashboardPage,
 });
 
 function getStatusVariant(
-  s: ServerItem
+  s: DashboardServerItem
 ): "default" | "destructive" | "secondary" {
   if (s.containerStatus === "running") {
     return "default";
@@ -42,7 +38,7 @@ function getStatusVariant(
   return "secondary";
 }
 
-function getStatusLabel(s: ServerItem): string {
+function getStatusLabel(s: DashboardServerItem): string {
   if (s.status === "installing") {
     return "Installing";
   }
@@ -68,6 +64,13 @@ function UsageBar({
   const unlimited = limit === 0;
   const percent = unlimited ? 0 : Math.min((used / limit) * 100, 100);
   const overprovisioned = !unlimited && used > limit;
+  let barColorClassName = "bg-primary";
+
+  if (overprovisioned) {
+    barColorClassName = "bg-destructive";
+  } else if (percent > 80) {
+    barColorClassName = "bg-yellow-500";
+  }
 
   return (
     <div className="space-y-1">
@@ -83,13 +86,7 @@ function UsageBar({
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted">
         <div
-          className={`h-full rounded-full transition-all ${
-            overprovisioned
-              ? "bg-destructive"
-              : percent > 80
-                ? "bg-yellow-500"
-                : "bg-primary"
-          }`}
+          className={`h-full rounded-full transition-all ${barColorClassName}`}
           style={{ width: unlimited ? "0%" : `${Math.min(percent, 100)}%` }}
         />
       </div>
@@ -99,8 +96,7 @@ function UsageBar({
 
 function ResourceUsageCard() {
   const { data, isLoading } = useQuery({
-    queryKey: ["my-allocations"],
-    queryFn: () => api.get<AllocationResponse>("/allocations/me"),
+    ...allocationsQueryOptions(),
   });
 
   if (isLoading) {
@@ -196,9 +192,7 @@ function ResourceUsageCard() {
 
 function DashboardPage() {
   const { data: servers, isLoading } = useQuery({
-    queryKey: ["servers"],
-    queryFn: () => api.get<ServerItem[]>("/servers"),
-    refetchInterval: 15_000,
+    ...serversQueryOptions(),
   });
 
   return (

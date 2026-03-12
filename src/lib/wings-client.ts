@@ -7,6 +7,8 @@ import { createLogger } from "./logger";
 const logger = createLogger("wings");
 
 const TRAILING_SLASH_RE = /\/+$/;
+const DEFAULT_TIMEOUT_MS = 15_000;
+const FILE_TIMEOUT_MS = 30_000;
 
 interface WingsNode {
   token: string;
@@ -40,6 +42,7 @@ export class WingsClient {
         Accept: "application/json",
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -126,6 +129,7 @@ export class WingsClient {
       `${this.baseUrl}/api/servers/${uuid}/files/contents?file=${encodeURIComponent(file)}`,
       {
         headers: { Authorization: this.authHeader },
+        signal: AbortSignal.timeout(FILE_TIMEOUT_MS),
       }
     );
     if (!res.ok) {
@@ -153,6 +157,7 @@ export class WingsClient {
           "Content-Type": "application/octet-stream",
         },
         body: content,
+        signal: AbortSignal.timeout(FILE_TIMEOUT_MS),
       }
     );
     if (!res.ok) {

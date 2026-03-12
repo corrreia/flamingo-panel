@@ -9,13 +9,10 @@ import { apiRoutes } from "../api";
 
 const REQUIRED_ENV = [
   "BETTER_AUTH_SECRET",
-  "CF_ACCOUNT_ID",
   "OIDC_CLIENT_ID",
   "OIDC_CLIENT_SECRET",
   "OIDC_DISCOVERY_URL",
   "PANEL_URL",
-  "R2_ACCESS_KEY_ID",
-  "R2_SECRET_ACCESS_KEY",
 ] as const;
 
 let missingEnv: string[] | null = null;
@@ -27,7 +24,7 @@ function checkEnv(): string[] | null {
   }
   envChecked = true;
   const missing = REQUIRED_ENV.filter(
-    (key) => !(env as Record<string, unknown>)[key]
+    (key) => !(env as unknown as Record<string, unknown>)[key]
   );
   missingEnv = missing.length > 0 ? missing : null;
   return missingEnv;
@@ -35,7 +32,25 @@ function checkEnv(): string[] | null {
 
 // Hono API app — handles /api/* routes
 const api = new Hono<{ Bindings: Env }>();
-api.use("/api/*", cors());
+api.use(
+  "/api/*",
+  cors({
+    credentials: true,
+    origin: (origin) => {
+      const allowedOrigins = new Set<string>([env.PANEL_URL]);
+
+      if (origin?.startsWith("http://localhost:")) {
+        allowedOrigins.add(origin);
+      }
+
+      if (!origin) {
+        return env.PANEL_URL;
+      }
+
+      return allowedOrigins.has(origin) ? origin : null;
+    },
+  })
+);
 api.route("/api", apiRoutes);
 
 // TanStack Start handler — handles SSR pages
@@ -48,10 +63,7 @@ export default {
       console.error(
         `Missing required environment variables: ${missing.join(", ")}`
       );
-      return new Response(
-        `Server misconfigured — missing env: ${missing.join(", ")}`,
-        { status: 500 }
-      );
+      return new Response("Server misconfigured", { status: 500 });
     }
 
     const url = new URL(request.url);

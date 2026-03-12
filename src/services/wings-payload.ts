@@ -54,6 +54,50 @@ function resolvePlaceholder(
   });
 }
 
+function buildConfigReplacements(
+  config: Record<string, unknown>,
+  serverSettings: Record<string, unknown>,
+  environment: Record<string, string>
+): unknown[] {
+  const replace: unknown[] = [];
+  const find = config.find as Record<string, unknown> | undefined;
+
+  if (!(find && typeof find === "object")) {
+    return replace;
+  }
+
+  for (const [match, value] of Object.entries(find)) {
+    if (typeof value === "object" && value !== null) {
+      const condition = value as Record<string, unknown>;
+      replace.push({
+        match,
+        if_value: resolvePlaceholder(
+          String(condition.if_value ?? ""),
+          serverSettings,
+          environment
+        ),
+        replace_with: resolvePlaceholder(
+          String(condition.replace_with ?? ""),
+          serverSettings,
+          environment
+        ),
+      });
+      continue;
+    }
+
+    replace.push({
+      match,
+      replace_with: resolvePlaceholder(
+        String(value ?? ""),
+        serverSettings,
+        environment
+      ),
+    });
+  }
+
+  return replace;
+}
+
 /**
  * Transform egg config_files from Pelican's object format to Wings' array format.
  *
@@ -102,42 +146,10 @@ function transformConfigFiles(
     }
     const cfg = config as Record<string, unknown>;
 
-    const replace: unknown[] = [];
-    const find = cfg.find as Record<string, unknown> | undefined;
-    if (find && typeof find === "object") {
-      for (const [match, value] of Object.entries(find)) {
-        if (typeof value === "object" && value !== null) {
-          const cond = value as Record<string, unknown>;
-          replace.push({
-            match,
-            if_value: resolvePlaceholder(
-              String(cond.if_value ?? ""),
-              serverSettings,
-              environment
-            ),
-            replace_with: resolvePlaceholder(
-              String(cond.replace_with ?? ""),
-              serverSettings,
-              environment
-            ),
-          });
-        } else {
-          replace.push({
-            match,
-            replace_with: resolvePlaceholder(
-              String(value ?? ""),
-              serverSettings,
-              environment
-            ),
-          });
-        }
-      }
-    }
-
     result.push({
       file,
       parser: cfg.parser || "file",
-      replace,
+      replace: buildConfigReplacements(cfg, serverSettings, environment),
     });
   }
 
